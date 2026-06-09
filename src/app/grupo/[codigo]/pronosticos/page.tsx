@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -155,6 +155,28 @@ export default function PronosticosPage() {
   function irAnterior() {
     if (matchIndex > 0) setMatchIndex(i => i - 1)
   }
+
+  // Auto-save: keeps a ref to the latest guardarPronostico to avoid stale closures
+  const guardarRef = useRef(guardarPronostico)
+  guardarRef.current = guardarPronostico
+
+  // Derived key: changes whenever the current match or its scores change
+  const currentScoreStr = `${matchIndex}:${scores[partidos[matchIndex]?.id]?.local ?? ''}:${scores[partidos[matchIndex]?.id]?.visitante ?? ''}`
+
+  // When both inputs are filled, auto-save after 1.2s with no further changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const p = partidos[matchIndex]
+    if (!p || !participante) return
+    if (partidoCerrado(p.fecha)) return
+    const sc = scores[p.id]
+    if (!sc || sc.local === '' || sc.visitante === '') return
+    const pron = pronosticos[p.id]
+    if (pron && sc.local === String(pron.goles_local) && sc.visitante === String(pron.goles_visitante)) return
+    const timer = setTimeout(() => guardarRef.current(p), 1200)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentScoreStr])
 
   if (loading) return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950">
