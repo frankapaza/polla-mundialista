@@ -7,7 +7,29 @@ import { supabase } from '@/lib/supabase'
 import { partidoEnVivo } from '@/lib/utils'
 import type { Grupo, Participante, Pronostico, Partido } from '@/lib/types'
 
-type RankingRow = Participante & { total: number; exactos: number; ganadores: number }
+type RankingRow = Participante & {
+  total: number
+  exactos: number
+  ganadores: number
+  sparkData: number[]
+}
+
+function Sparkline({ data }: { data: number[] }) {
+  if (data.length < 2) return null
+  const w = 56
+  const h = 20
+  const max = Math.max(...data, 1)
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w
+    const y = h - (v / max) * h * 0.9 - 1
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  return (
+    <svg width={w} height={h} className="opacity-80 flex-shrink-0">
+      <polyline fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" points={pts} />
+    </svg>
+  )
+}
 
 export default function RankingPage() {
   const params = useParams()
@@ -32,7 +54,7 @@ export default function RankingPage() {
       ids.length > 0
         ? supabase.from('pronosticos').select().in('participante_id', ids)
         : Promise.resolve({ data: [] }),
-      supabase.from('partidos').select().eq('fase', 'grupos').order('fecha'),
+      supabase.from('partidos').select().order('fecha'),
     ])
 
     const vivos = (partidos ?? []).filter((p: Partido) =>
@@ -40,12 +62,22 @@ export default function RankingPage() {
     )
     setPartidosVivos(vivos as Partido[])
 
+    const partidosConResult = (partidos ?? []).filter((p: Partido) => p.goles_local !== null)
+
     const calc = (participantes ?? []).map((p: Participante) => {
       const prs = (pronos ?? []).filter((pr: Pronostico) => pr.participante_id === p.id)
       const total = prs.reduce((s: number, pr: Pronostico) => s + (pr.puntos ?? 0), 0)
       const exactos = prs.filter((pr: Pronostico) => pr.puntos === 3).length
       const ganadores = prs.filter((pr: Pronostico) => pr.puntos === 1).length
-      return { ...p, total, exactos, ganadores }
+
+      let cumulative = 0
+      const sparkData = partidosConResult.map((partido: Partido) => {
+        const prono = prs.find((pr: Pronostico) => pr.partido_id === partido.id)
+        cumulative += prono?.puntos ?? 0
+        return cumulative
+      })
+
+      return { ...p, total, exactos, ganadores, sparkData }
     }).sort((a: RankingRow, b: RankingRow) => b.total - a.total)
 
     setGrupo(g as Grupo)
@@ -64,7 +96,6 @@ export default function RankingPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, () => cargarRanking())
       .subscribe()
 
-    // Polling fallback cada 30s
     const interval = setInterval(cargarRanking, 30_000)
 
     return () => {
@@ -96,6 +127,7 @@ export default function RankingPage() {
   const totalPendientes = ranking.length - totalPagaron
   const recaudado = totalPagaron * g.costo_inscripcion
   const hayPartidosVivos = partidosVivos.length > 0
+  const haySparklines = ranking.some(r => r.sparkData.length >= 2)
 
   return (
     <main className="min-h-screen bg-slate-950 pb-16">
@@ -142,7 +174,6 @@ export default function RankingPage() {
           </div>
         )}
 
-        {/* Flash actualización silenciosa */}
         {!hayPartidosVivos && flashActualizado && (
           <div className="text-center text-xs text-emerald-500 mb-2 transition-opacity">
             ↻ Actualizado
@@ -200,46 +231,58 @@ export default function RankingPage() {
             )}
 
             {ranking.map((p, i) => (
-              <div key={p.id} className={`bg-slate-900 border rounded-xl px-4 py-3.5 flex items-center gap-3 transition-all ${
+              <div key={p.id} className={`bg-slate-900 border rounded-xl px-4 py-3.5 transition-all ${
                 i === 0 && hayPuntos ? 'border-amber-600/60' :
                 i === 1 && hayPuntos ? 'border-slate-500/60' :
                 i === 2 && hayPuntos ? 'border-amber-800/60' : 'border-slate-800'
               }`}>
-                <div className="w-8 text-center flex-shrink-0">
-                  {i === 0 && hayPuntos ? '🥇' : i === 1 && hayPuntos ? '🥈' : i === 2 && hayPuntos ? '🥉' :
-                    <span className="text-slate-500 font-bold text-sm">{i + 1}</span>}
-                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 text-center flex-shrink-0">
+                    {i === 0 && hayPuntos ? '🥇' : i === 1 && hayPuntos ? '🥈' : i === 2 && hayPuntos ? '🥉' :
+                      <span className="text-slate-500 font-bold text-sm">{i + 1}</span>}
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-white font-semibold truncate">{p.nombre}</p>
-                    {tieneCosto && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
-                        p.pago ? 'bg-emerald-900/60 text-emerald-400' : 'bg-amber-900/60 text-amber-400'
-                      }`}>
-                        {p.pago ? '✓ Pagó' : '⏳ Pendiente'}
-                      </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-white font-semibold truncate">{p.nombre}</p>
+                      {tieneCosto && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
+                          p.pago ? 'bg-emerald-900/60 text-emerald-400' : 'bg-amber-900/60 text-amber-400'
+                        }`}>
+                          {p.pago ? '✓ Pagó' : '⏳ Pendiente'}
+                        </span>
+                      )}
+                    </div>
+                    {p.prediccion_campeon && (
+                      <p className="text-slate-500 text-xs mt-0.5">
+                        🏆 <span className="text-slate-400">{p.prediccion_campeon}</span>
+                      </p>
                     )}
                   </div>
-                  <p className="text-slate-600 text-xs">Doc: {p.documento}</p>
-                </div>
 
-                <div className="flex items-center gap-4 flex-shrink-0 text-right">
-                  {hayPuntos && (
-                    <>
-                      <div className="hidden sm:block text-center">
-                        <p className="text-emerald-400 font-bold text-sm">{p.exactos}</p>
-                        <p className="text-slate-600 text-xs">exactos</p>
-                      </div>
-                      <div className="hidden sm:block text-center">
-                        <p className="text-blue-400 font-bold text-sm">{p.ganadores}</p>
-                        <p className="text-slate-600 text-xs">ganadores</p>
-                      </div>
-                    </>
+                  {haySparklines && (
+                    <div className="flex-shrink-0 hidden sm:block">
+                      <Sparkline data={p.sparkData} />
+                    </div>
                   )}
-                  <div className="text-center">
-                    <p className="text-white font-bold text-xl">{p.total}</p>
-                    <p className="text-slate-500 text-xs">pts</p>
+
+                  <div className="flex items-center gap-4 flex-shrink-0 text-right">
+                    {hayPuntos && (
+                      <>
+                        <div className="hidden sm:block text-center">
+                          <p className="text-emerald-400 font-bold text-sm">{p.exactos}</p>
+                          <p className="text-slate-600 text-xs">exactos</p>
+                        </div>
+                        <div className="hidden sm:block text-center">
+                          <p className="text-blue-400 font-bold text-sm">{p.ganadores}</p>
+                          <p className="text-slate-600 text-xs">ganadores</p>
+                        </div>
+                      </>
+                    )}
+                    <div className="text-center">
+                      <p className="text-white font-bold text-xl">{p.total}</p>
+                      <p className="text-slate-500 text-xs">pts</p>
+                    </div>
                   </div>
                 </div>
               </div>

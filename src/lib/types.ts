@@ -5,6 +5,7 @@ export interface Grupo {
   costo_inscripcion: number
   cierre_inscripciones: string | null
   admin_password: string | null
+  campeon: string | null
   created_at: string
 }
 
@@ -14,6 +15,7 @@ export interface Participante {
   nombre: string
   documento: string
   pago: boolean
+  prediccion_campeon: string | null
   created_at: string
 }
 

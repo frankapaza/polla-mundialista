@@ -80,8 +80,20 @@ export default function GrupoPage() {
   const [notFound, setNotFound] = useState(false)
   const [nombre, setNombre] = useState('')
   const [documento, setDocumento] = useState('')
+  const [campeon, setCampeon] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const EQUIPOS = [
+    'Alemania','Arabia Saudita','Argelia','Argentina','Australia','Austria',
+    'Bosnia y Herzegovina','Brasil','Bélgica','Cabo Verde','Canadá','Catar',
+    'Chequia','Colombia','Congo RD','Corea del Sur','Costa de Marfil','Croacia',
+    'Curazao','Ecuador','Egipto','Escocia','España','Estados Unidos',
+    'Francia','Ghana','Haití','Inglaterra','Iraq','Irán','Japón','Jordania',
+    'Marruecos','México','Noruega','Nueva Zelanda','Panamá','Paraguay',
+    'Países Bajos','Portugal','Senegal','Sudáfrica','Suecia','Suiza',
+    'Turquía','Túnez','Uruguay','Uzbekistán',
+  ]
 
   useEffect(() => {
     // Si ya está registrado, ir a pronósticos
@@ -116,7 +128,7 @@ export default function GrupoPage() {
 
     const { data, error: dbError } = await supabase
       .from('participantes')
-      .insert({ grupo_id: grupo!.id, nombre: nombre.trim(), documento: documento.trim() })
+      .insert({ grupo_id: grupo!.id, nombre: nombre.trim(), documento: documento.trim(), prediccion_campeon: campeon || null })
       .select()
       .single()
 
@@ -228,6 +240,19 @@ export default function GrupoPage() {
               maxLength={20}
               className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              🏆 ¿Quién ganará el Mundial? <span className="text-slate-500 font-normal">(opcional)</span>
+            </label>
+            <select
+              value={campeon}
+              onChange={e => setCampeon(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="">— Elige un campeón —</option>
+              {EQUIPOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+            </select>
           </div>
 
           {error && <p className="text-red-400 text-sm">{error}</p>}

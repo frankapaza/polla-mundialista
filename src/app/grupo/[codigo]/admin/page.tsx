@@ -11,6 +11,57 @@ type Tab = 'pagos' | 'resultados' | 'config' | 'dashboard'
 
 const GRUPOS_TORNEO = ['A','B','C','D','E','F','G','H','I','J','K','L']
 
+function PartidoResultadoCard({ partido, resultados, savingRes, resMsg, setResultado, guardarResultado }: {
+  partido: Partido
+  resultados: Record<string, { local: string; visitante: string }>
+  savingRes: Record<string, boolean>
+  resMsg: Record<string, string>
+  setResultado: (id: string, side: 'local' | 'visitante', val: string) => void
+  guardarResultado: (partido: Partido) => void
+}) {
+  const r = resultados[partido.id] ?? { local: '', visitante: '' }
+  const yaIngresado = partido.goles_local !== null
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div className="text-xs text-slate-500 mb-3">
+        {formatearFecha(partido.fecha)} · #{partido.numero_partido}
+      </div>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex-1 text-right">
+          <span className="text-white font-semibold text-sm">{partido.equipo_local}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input type="text" inputMode="numeric" value={r.local}
+            onChange={e => setResultado(partido.id, 'local', e.target.value)}
+            placeholder="0"
+            className="w-10 h-10 bg-slate-800 border border-slate-600 rounded-lg text-center text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <span className="text-slate-500 font-bold">-</span>
+          <input type="text" inputMode="numeric" value={r.visitante}
+            onChange={e => setResultado(partido.id, 'visitante', e.target.value)}
+            placeholder="0"
+            className="w-10 h-10 bg-slate-800 border border-slate-600 rounded-lg text-center text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        </div>
+        <div className="flex-1">
+          <span className="text-white font-semibold text-sm">{partido.equipo_visitante}</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-500">
+          {resMsg[partido.id] || (yaIngresado
+            ? `Resultado: ${partido.goles_local}-${partido.goles_visitante}`
+            : 'Sin resultado')}
+        </span>
+        <button
+          onClick={() => guardarResultado(partido)}
+          disabled={savingRes[partido.id]}
+          className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40">
+          {savingRes[partido.id] ? 'Guardando...' : yaIngresado ? 'Actualizar' : 'Guardar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminGrupoPage() {
   const params = useParams()
   const router = useRouter()
@@ -29,6 +80,7 @@ export default function AdminGrupoPage() {
   // Config
   const [costo, setCosto] = useState('')
   const [cierre, setCierre] = useState('')
+  const [campeonConfig, setCampeonConfig] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
   const [configMsg, setConfigMsg] = useState('')
 
@@ -39,7 +91,21 @@ export default function AdminGrupoPage() {
   const [resultados, setResultados] = useState<Record<string, { local: string; visitante: string }>>({})
   const [savingRes, setSavingRes] = useState<Record<string, boolean>>({})
   const [resMsg, setResMsg] = useState<Record<string, string>>({})
+  const [waMensaje, setWaMensaje] = useState<string | null>(null)
   const [grupoActivo, setGrupoActivo] = useState('A')
+  const [faseResultados, setFaseResultados] = useState<'grupos' | 'eliminatoria'>('grupos')
+  const [faseElim, setFaseElim] = useState('octavos')
+
+  const EQUIPOS_MUNDIAL = [
+    'Alemania','Arabia Saudita','Argelia','Argentina','Australia','Austria',
+    'Bosnia y Herzegovina','Brasil','Bélgica','Cabo Verde','Canadá','Catar',
+    'Chequia','Colombia','Congo RD','Corea del Sur','Costa de Marfil','Croacia',
+    'Curazao','Ecuador','Egipto','Escocia','España','Estados Unidos',
+    'Francia','Ghana','Haití','Inglaterra','Iraq','Irán','Japón','Jordania',
+    'Marruecos','México','Noruega','Nueva Zelanda','Panamá','Paraguay',
+    'Países Bajos','Portugal','Senegal','Sudáfrica','Suecia','Suiza',
+    'Turquía','Túnez','Uruguay','Uzbekistán',
+  ]
 
   const cargarDatos = useCallback(async () => {
     setLoading(true)
@@ -57,6 +123,7 @@ export default function AdminGrupoPage() {
     setGrupo(g)
     setParticipantes((partData ?? []) as Participante[])
     setCosto(g.costo_inscripcion > 0 ? String(g.costo_inscripcion) : '')
+    setCampeonConfig(g.campeon ?? '')
     setCierre(g.cierre_inscripciones
       ? new Date(g.cierre_inscripciones).toISOString().slice(0, 16)
       : '')
@@ -104,6 +171,7 @@ export default function AdminGrupoPage() {
     const { error } = await supabase.from('grupos').update({
       costo_inscripcion: costo ? parseFloat(costo) : 0,
       cierre_inscripciones: cierre ? new Date(cierre).toISOString() : null,
+      campeon: campeonConfig || null,
     }).eq('id', grupo.id)
     setSavingConfig(false)
     if (error) {
@@ -167,6 +235,23 @@ export default function AdminGrupoPage() {
     setSavingRes(prev => ({ ...prev, [partido.id]: false }))
     setResMsg(prev => ({ ...prev, [partido.id]: `✅ ${pronos?.length ?? 0} pronósticos actualizados` }))
     setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p))
+
+    // Generar mensaje WhatsApp con resultados
+    if (pronos && pronos.length > 0) {
+      const exactos = (pronos as Pronostico[]).filter(pr => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv) === 3)
+      const ganadores = (pronos as Pronostico[]).filter(pr => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv) === 1)
+      const fallaron = (pronos as Pronostico[]).filter(pr => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv) === 0)
+      const nombrePart = (id: string) => participantes.find(p => p.id === id)?.nombre ?? id
+
+      const lineas = [
+        `⚽ *${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}*`,
+        ``,
+        exactos.length > 0 ? `🎯 *Exactos (3pts):*\n${exactos.map(pr => `• ${nombrePart(pr.participante_id)} (${pr.goles_local}-${pr.goles_visitante})`).join('\n')}` : '',
+        ganadores.length > 0 ? `✅ *Ganador correcto (1pt):*\n${ganadores.map(pr => `• ${nombrePart(pr.participante_id)} (${pr.goles_local}-${pr.goles_visitante})`).join('\n')}` : '',
+        fallaron.length > 0 ? `❌ *Fallaron:*\n${fallaron.map(pr => `• ${nombrePart(pr.participante_id)} (${pr.goles_local}-${pr.goles_visitante})`).join('\n')}` : '',
+      ].filter(Boolean).join('\n')
+      setWaMensaje(lineas)
+    }
   }
 
   if (!autenticado) {
@@ -219,9 +304,18 @@ export default function AdminGrupoPage() {
     : false
 
   const partidosPorGrupo = GRUPOS_TORNEO.reduce((acc, g) => {
-    acc[g] = partidos.filter(p => p.grupo_torneo === g)
+    acc[g] = partidos.filter(p => p.grupo_torneo === g && p.fase === 'grupos')
     return acc
   }, {} as Record<string, Partido[]>)
+
+  const FASES_ELIM: { id: string; label: string }[] = [
+    { id: 'octavos', label: 'Octavos' },
+    { id: 'cuartos', label: 'Cuartos' },
+    { id: 'semis', label: 'Semifinal' },
+    { id: 'tercero', label: '3° Puesto' },
+    { id: 'final', label: 'Final' },
+  ]
+  const partidosElim = partidos.filter(p => p.fase !== 'grupos')
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'pagos', label: 'Pagos' },
@@ -335,67 +429,82 @@ export default function AdminGrupoPage() {
         {/* ── RESULTADOS ── */}
         {tab === 'resultados' && (
           <div>
-            {/* Tabs grupos A-L */}
-            <div className="flex gap-1 overflow-x-auto mb-4">
-              {GRUPOS_TORNEO.map(g => (
-                <button key={g} onClick={() => setGrupoActivo(g)}
-                  className={`flex-shrink-0 px-3 py-1 rounded-md text-sm font-semibold transition-colors ${
-                    grupoActivo === g ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}>
-                  {g}
-                </button>
-              ))}
+            {/* WhatsApp share */}
+            {waMensaje && (
+              <div className="bg-green-900/30 border border-green-700/50 rounded-xl p-4 mb-4">
+                <p className="text-green-400 text-xs font-semibold mb-2">Compartir resultado</p>
+                <pre className="text-slate-300 text-xs whitespace-pre-wrap font-sans bg-slate-900 rounded-lg p-3 mb-3 leading-relaxed">{waMensaje}</pre>
+                <div className="flex gap-2">
+                  <a href={`https://wa.me/?text=${encodeURIComponent(waMensaje)}`} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 bg-green-700 hover:bg-green-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors text-center">
+                    💬 Compartir en WhatsApp
+                  </a>
+                  <button onClick={() => setWaMensaje(null)}
+                    className="px-3 text-slate-500 hover:text-slate-300 text-xs transition-colors">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Sub-tabs: Grupos / Eliminatoria */}
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => setFaseResultados('grupos')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${faseResultados === 'grupos' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
+                Fase de Grupos
+              </button>
+              <button onClick={() => setFaseResultados('eliminatoria')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${faseResultados === 'eliminatoria' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
+                Eliminatoria
+              </button>
             </div>
 
-            <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">
-              Grupo {grupoActivo}
-            </h2>
+            {faseResultados === 'grupos' && (
+              <>
+                <div className="flex gap-1 overflow-x-auto mb-4">
+                  {GRUPOS_TORNEO.map(g => (
+                    <button key={g} onClick={() => setGrupoActivo(g)}
+                      className={`flex-shrink-0 px-3 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        grupoActivo === g ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+                <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Grupo {grupoActivo}</h2>
+                <div className="space-y-3">
+                  {partidosPorGrupo[grupoActivo]?.map(partido => <PartidoResultadoCard key={partido.id} partido={partido} resultados={resultados} savingRes={savingRes} resMsg={resMsg} setResultado={setResultado} guardarResultado={guardarResultado} />)}
+                </div>
+              </>
+            )}
 
-            <div className="space-y-3">
-              {partidosPorGrupo[grupoActivo]?.map(partido => {
-                const r = resultados[partido.id] ?? { local: '', visitante: '' }
-                const yaIngresado = partido.goles_local !== null
-                return (
-                  <div key={partido.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <div className="text-xs text-slate-500 mb-3">
-                      {formatearFecha(partido.fecha)} · #{partido.numero_partido}
-                    </div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 text-right">
-                        <span className="text-white font-semibold text-sm">{partido.equipo_local}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <input type="text" inputMode="numeric" value={r.local}
-                          onChange={e => setResultado(partido.id, 'local', e.target.value)}
-                          placeholder="0"
-                          className="w-10 h-10 bg-slate-800 border border-slate-600 rounded-lg text-center text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                        <span className="text-slate-500 font-bold">-</span>
-                        <input type="text" inputMode="numeric" value={r.visitante}
-                          onChange={e => setResultado(partido.id, 'visitante', e.target.value)}
-                          placeholder="0"
-                          className="w-10 h-10 bg-slate-800 border border-slate-600 rounded-lg text-center text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                      </div>
-                      <div className="flex-1">
-                        <span className="text-white font-semibold text-sm">{partido.equipo_visitante}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500">
-                        {resMsg[partido.id] || (yaIngresado
-                          ? `Resultado: ${partido.goles_local}-${partido.goles_visitante}`
-                          : 'Sin resultado')}
-                      </span>
-                      <button
-                        onClick={() => guardarResultado(partido)}
-                        disabled={savingRes[partido.id]}
-                        className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40">
-                        {savingRes[partido.id] ? 'Guardando...' : yaIngresado ? 'Actualizar' : 'Guardar'}
-                      </button>
-                    </div>
+            {faseResultados === 'eliminatoria' && (
+              <>
+                {partidosElim.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <p className="text-4xl mb-3">🏆</p>
+                    <p>No hay partidos de eliminatoria cargados aún</p>
+                    <p className="text-xs mt-2">Pedile al superadmin que corra el seed_knockout.sql</p>
                   </div>
-                )
-              })}
-            </div>
+                ) : (
+                  <>
+                    <div className="flex gap-1 overflow-x-auto mb-4">
+                      {FASES_ELIM.map(f => (
+                        <button key={f.id} onClick={() => setFaseElim(f.id)}
+                          className={`flex-shrink-0 px-3 py-1 rounded-md text-sm font-semibold transition-colors ${
+                            faseElim === f.id ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}>
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      {partidosElim.filter(p => p.fase === faseElim).map(partido => <PartidoResultadoCard key={partido.id} partido={partido} resultados={resultados} savingRes={savingRes} resMsg={resMsg} setResultado={setResultado} guardarResultado={guardarResultado} />)}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -423,6 +532,22 @@ export default function AdminGrupoPage() {
                 className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]" />
               <p className="text-slate-600 text-xs mt-1">
                 Después de esta fecha todos podrán ver los pronósticos de los demás
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                🏆 Campeón del grupo <span className="text-slate-500 font-normal">(quién ganó la polla)</span>
+              </label>
+              <select value={campeonConfig}
+                onChange={e => { setCampeonConfig(e.target.value); setConfigMsg('') }}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="">— Sin campeón aún —</option>
+                {participantes.map(p => (
+                  <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                ))}
+              </select>
+              <p className="text-slate-600 text-xs mt-1">
+                Seleccioná al ganador de la polla para mostrarlo en el ranking
               </p>
             </div>
             <div className="flex items-center justify-between pt-1">
