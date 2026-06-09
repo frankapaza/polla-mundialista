@@ -42,6 +42,7 @@ export default function PronosticosPage() {
   const [loading, setLoading] = useState(true)
   const [mostrarLista, setMostrarLista] = useState(false)
   const [, setTick] = useState(0)
+  const [bannerRetomar, setBannerRetomar] = useState('')
 
   // Ticker por segundo para countdowns en tiempo real
   useEffect(() => {
@@ -85,7 +86,19 @@ export default function PronosticosPage() {
     const primerPendiente = sorted.findIndex(p =>
       !partidoCerrado(p.fecha) && !pronosMap[p.id]
     )
-    setMatchIndex(primerPendiente >= 0 ? primerPendiente : 0)
+    const idx = primerPendiente >= 0 ? primerPendiente : 0
+    setMatchIndex(idx)
+
+    const conPronos = Object.keys(pronosMap).length
+    if (conPronos > 0) {
+      if (primerPendiente > 0) {
+        setBannerRetomar(`✓ Tenés ${conPronos} pronósticos guardados · Continuás en el partido #${primerPendiente + 1}`)
+      } else if (primerPendiente === -1) {
+        setBannerRetomar(`🏆 ¡Todos tus pronósticos están listos! (${conPronos}/${sorted.length})`)
+      }
+      setTimeout(() => setBannerRetomar(''), 5000)
+    }
+
     setLoading(false)
   }, [codigo, router])
 
@@ -174,7 +187,7 @@ export default function PronosticosPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded-full">
-              {totalPronos}/72
+              {totalPronos}/{partidos.length}
             </span>
             {inscripcionesCerradas && (
               <Link href={`/grupo/${codigo}/dashboard`}
@@ -189,6 +202,15 @@ export default function PronosticosPage() {
           </div>
         </div>
       </div>
+
+      {/* Banner retomar */}
+      {bannerRetomar && (
+        <div className="max-w-lg mx-auto w-full px-4 pt-3">
+          <div className="bg-emerald-900/30 border border-emerald-700/40 rounded-lg px-4 py-2.5 text-emerald-400 text-xs text-center font-medium">
+            {bannerRetomar}
+          </div>
+        </div>
+      )}
 
       {/* Progreso global */}
       <div className="max-w-lg mx-auto w-full px-4 pt-4">
@@ -351,9 +373,9 @@ export default function PronosticosPage() {
               )}
               {!empezó && !cerrado && (
                 <span className={`text-xs font-medium transition-colors ${
-                  yaGuardado ? 'text-emerald-400' : tienePronos ? 'text-slate-400' : 'text-slate-600'
+                  yaGuardado ? 'text-emerald-400' : tienePronos ? 'text-amber-400' : 'text-slate-600'
                 }`}>
-                  {yaGuardado ? '✅ Guardado' : tienePronos ? 'Sin guardar' : 'Sin pronóstico'}
+                  {yaGuardado ? '✅ Guardado' : tienePronos ? '⚠ Sin guardar — presioná Guardar y seguir' : 'Sin pronóstico'}
                 </span>
               )}
             </div>
