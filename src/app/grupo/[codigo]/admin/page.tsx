@@ -452,7 +452,7 @@ export default function AdminGrupoPage() {
                 : grupo.cierre_inscripciones
                   ? <>Se desbloquea el{' '}
                       <strong className="text-white">
-                        {new Date(grupo.cierre_inscripciones).toLocaleString('es-AR', {
+                        {new Date(grupo.cierre_inscripciones).toLocaleString('es-PE', {
                           day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
                         })}
                       </strong>.

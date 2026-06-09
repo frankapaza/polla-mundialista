@@ -178,7 +178,7 @@ export default function RankingPage() {
               <div className="text-center">
                 <p className="text-xs text-slate-500">Cierre inscripciones</p>
                 <p className={`text-xs font-medium ${inscripcionesCerradas ? 'text-red-400' : 'text-slate-300'}`}>
-                  {inscripcionesCerradas ? '🔒 Cerrado' : new Date(g.cierre_inscripciones).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  {inscripcionesCerradas ? '🔒 Cerrado' : new Date(g.cierre_inscripciones).toLocaleString('es-PE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             )}

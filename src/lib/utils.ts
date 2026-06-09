@@ -21,13 +21,13 @@ export function generarCodigo(largo = 6): string {
 
 export function formatearFecha(fecha: string | null): string {
   if (!fecha) return 'Fecha por confirmar'
-  return new Date(fecha).toLocaleString('es-AR', {
+  return new Date(fecha).toLocaleString('es-PE', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'America/Argentina/Buenos_Aires',
+    timeZone: 'America/Lima',
   })
 }
 
@@ -50,14 +50,29 @@ export function partidoEnVivo(fecha: string | null): boolean {
   return ahora >= inicio && ahora <= inicio + 2 * 60 * 60 * 1000
 }
 
-// Texto de countdown hasta el cierre (null si faltan más de 24h)
+// Texto de countdown hasta el cierre (null si faltan más de 48h)
 export function formatearCountdown(fecha: string | null): string | null {
   if (!fecha) return null
   const deadline = new Date(fecha).getTime() - 24 * 60 * 60 * 1000
   const diff = deadline - Date.now()
-  if (diff <= 0 || diff > 24 * 60 * 60 * 1000) return null
+  if (diff <= 0 || diff > 48 * 60 * 60 * 1000) return null
   const h = Math.floor(diff / (1000 * 60 * 60))
   const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-  if (h > 0) return `Cierra en ${h}h ${m}m`
-  return `Cierra en ${m}m`
+  const s = Math.floor((diff % (1000 * 60)) / 1000)
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+// Semáforo: color según urgencia del cierre
+export type SemaforoColor = 'green' | 'yellow' | 'red' | 'closed' | 'open'
+export function semaforoColor(fecha: string | null): SemaforoColor {
+  if (!fecha) return 'open'
+  const deadline = new Date(fecha).getTime() - 24 * 60 * 60 * 1000
+  const diff = deadline - Date.now()
+  if (diff <= 0) return 'closed'
+  if (diff < 60 * 60 * 1000) return 'red'          // < 1h
+  if (diff < 6 * 60 * 60 * 1000) return 'yellow'   // < 6h
+  if (diff < 48 * 60 * 60 * 1000) return 'green'   // < 48h
+  return 'open'
 }

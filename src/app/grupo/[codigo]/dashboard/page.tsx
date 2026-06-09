@@ -51,7 +51,7 @@ export default async function DashboardPage({ params, searchParams }: Props) {
       <p className="text-slate-400 max-w-sm">
         Los pronósticos de todos se revelan después del cierre de inscripciones.
         {g.cierre_inscripciones && (
-          <> Cierra el <strong className="text-white">{new Date(g.cierre_inscripciones).toLocaleString('es-AR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</strong>.</>
+          <> Cierra el <strong className="text-white">{new Date(g.cierre_inscripciones).toLocaleString('es-PE', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</strong>.</>
         )}
       </p>
       <Link href={`/grupo/${codigoUpper}/ranking`} className="mt-6 text-emerald-400 hover:text-emerald-300 transition-colors">

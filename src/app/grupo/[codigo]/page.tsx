@@ -13,7 +13,7 @@ function CompartirWhatsApp({ grupo, codigo }: { grupo: Grupo; codigo: string }) 
   const url = typeof window !== 'undefined' ? `${window.location.origin}/grupo/${codigo}` : ''
 
   const cierreTexto = grupo.cierre_inscripciones
-    ? `⏰ Inscribite antes del ${new Date(grupo.cierre_inscripciones).toLocaleString('es-AR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}`
+    ? `⏰ Inscribite antes del ${new Date(grupo.cierre_inscripciones).toLocaleString('es-PE', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}`
     : ''
   const costoTexto = grupo.costo_inscripcion > 0
     ? `💵 Inscripción: S/ ${grupo.costo_inscripcion}`
