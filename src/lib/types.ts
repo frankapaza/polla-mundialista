@@ -4,6 +4,7 @@ export interface Grupo {
   codigo: string
   costo_inscripcion: number
   cierre_inscripciones: string | null
+  admin_password: string | null
   created_at: string
 }
 

@@ -43,7 +43,14 @@
       "mcp__chrome-devtools__press_key",
       "mcp__chrome-devtools__type_text",
       "Bash(python -m json.tool)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(ping *)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(f'{len\\(data\\)} pronósticos encontrados'\\)\")",
+      "Bash(python -c ' *)"
     ]
   }
 }

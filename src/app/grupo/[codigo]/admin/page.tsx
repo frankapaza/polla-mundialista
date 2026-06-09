@@ -85,7 +85,7 @@ export default function AdminGrupoPage() {
     const res = await fetch('/api/admin-auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password, codigo }),
     })
     if (res.ok) {
       sessionStorage.setItem('polla_admin', 'true')
