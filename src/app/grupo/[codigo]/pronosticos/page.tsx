@@ -381,13 +381,17 @@ export default function PronosticosPage() {
                 <div className="flex items-center gap-2">
                   <input type="text" inputMode="numeric" value={sc.local}
                     onChange={e => setScore(partido.id, 'local', e.target.value)}
-                    placeholder="0"
-                    className="w-14 h-14 bg-slate-800 border-2 border-slate-600 rounded-xl text-center text-white font-bold text-2xl focus:outline-none focus:border-emerald-500 transition-colors" />
+                    placeholder="–"
+                    className={`w-14 h-14 bg-slate-800 border-2 rounded-xl text-center font-bold text-2xl focus:outline-none transition-colors placeholder-slate-600 ${
+                      sc.local !== '' ? 'border-emerald-600 text-white' : 'border-slate-700 text-slate-400 focus:border-emerald-500'
+                    }`} />
                   <span className="text-slate-500 font-bold text-xl">-</span>
                   <input type="text" inputMode="numeric" value={sc.visitante}
                     onChange={e => setScore(partido.id, 'visitante', e.target.value)}
-                    placeholder="0"
-                    className="w-14 h-14 bg-slate-800 border-2 border-slate-600 rounded-xl text-center text-white font-bold text-2xl focus:outline-none focus:border-emerald-500 transition-colors" />
+                    placeholder="–"
+                    className={`w-14 h-14 bg-slate-800 border-2 rounded-xl text-center font-bold text-2xl focus:outline-none transition-colors placeholder-slate-600 ${
+                      sc.visitante !== '' ? 'border-emerald-600 text-white' : 'border-slate-700 text-slate-400 focus:border-emerald-500'
+                    }`} />
                 </div>
               )}
               {jugado && pron && (
