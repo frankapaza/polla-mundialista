@@ -9,7 +9,6 @@ import { flagUrl } from '@/lib/flags'
 import type { Partido, Pronostico, Grupo, Participante } from '@/lib/types'
 
 const STORAGE_KEY = (codigo: string) => `polla_participant_${codigo}`
-const GRUPOS_TORNEO = ['A','B','C','D','E','F','G','H','I','J','K','L']
 
 interface ScoreInput { local: string; visitante: string }
 
@@ -31,10 +30,8 @@ export default function PronosticosPage() {
   const [scores, setScores] = useState<Record<string, ScoreInput>>({})
   const [saving, setSaving] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
-  const [grupoActivo, setGrupoActivo] = useState('A')
   const [matchIndex, setMatchIndex] = useState(0)
   const [loading, setLoading] = useState(true)
-  // Ticker para actualizar countdowns cada minuto
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -50,7 +47,7 @@ export default function PronosticosPage() {
     const [{ data: grupoData }, { data: partData }, { data: particicData }, { data: pronosData }] =
       await Promise.all([
         supabase.from('grupos').select().eq('codigo', codigo).single(),
-        supabase.from('partidos').select().eq('fase', 'grupos').order('numero_partido'),
+        supabase.from('partidos').select().eq('fase', 'grupos').order('fecha').order('numero_partido'),
         supabase.from('participantes').select().eq('id', participanteId).single(),
         supabase.from('pronosticos').select().eq('participante_id', participanteId),
       ])
@@ -58,7 +55,13 @@ export default function PronosticosPage() {
     if (!grupoData) { router.replace(`/grupo/${codigo}`); return }
     setGrupo(grupoData as Grupo)
     setParticipante(particicData as Participante)
-    setPartidos((partData ?? []) as Partido[])
+
+    const sorted = ((partData ?? []) as Partido[]).sort((a, b) => {
+      if (!a.fecha) return 1
+      if (!b.fecha) return -1
+      return new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+    })
+    setPartidos(sorted)
 
     const pronosMap: Record<string, Pronostico> = {}
     const scoresMap: Record<string, ScoreInput> = {}
@@ -68,11 +71,16 @@ export default function PronosticosPage() {
     }
     setPronosticos(pronosMap)
     setScores(scoresMap)
+
+    // Auto-jump al primer partido abierto sin pronóstico
+    const primerPendiente = sorted.findIndex(p =>
+      !partidoCerrado(p.fecha) && !pronosMap[p.id]
+    )
+    setMatchIndex(primerPendiente >= 0 ? primerPendiente : 0)
     setLoading(false)
   }, [codigo, router])
 
   useEffect(() => { cargarDatos() }, [cargarDatos])
-  useEffect(() => { setMatchIndex(0) }, [grupoActivo])
 
   function setScore(partidoId: string, side: 'local' | 'visitante', val: string) {
     const num = val.replace(/\D/g, '').slice(0, 2)
@@ -110,13 +118,7 @@ export default function PronosticosPage() {
     return false
   }
 
-  const partidosPorGrupo = GRUPOS_TORNEO.reduce((acc, g) => {
-    acc[g] = partidos.filter(p => p.grupo_torneo === g)
-    return acc
-  }, {} as Record<string, Partido[]>)
-
-  const matchsActivos = partidosPorGrupo[grupoActivo] ?? []
-  const partido = matchsActivos[matchIndex]
+  const partido = partidos[matchIndex]
   const totalPronos = Object.keys(pronosticos).length
   const cierreInscripciones = grupo?.cierre_inscripciones
   const inscripcionesCerradas = cierreInscripciones ? new Date(cierreInscripciones) <= new Date() : false
@@ -125,27 +127,11 @@ export default function PronosticosPage() {
     if (partido && !partidoCerrado(partido.fecha)) {
       await guardarPronostico(partido)
     }
-    if (matchIndex < matchsActivos.length - 1) {
-      setMatchIndex(i => i + 1)
-    } else {
-      const idx = GRUPOS_TORNEO.indexOf(grupoActivo)
-      if (idx < GRUPOS_TORNEO.length - 1) {
-        setGrupoActivo(GRUPOS_TORNEO[idx + 1])
-      }
-    }
+    if (matchIndex < partidos.length - 1) setMatchIndex(i => i + 1)
   }
 
   function irAnterior() {
-    if (matchIndex > 0) {
-      setMatchIndex(i => i - 1)
-    } else {
-      const idx = GRUPOS_TORNEO.indexOf(grupoActivo)
-      if (idx > 0) {
-        const prevGrupo = GRUPOS_TORNEO[idx - 1]
-        setGrupoActivo(prevGrupo)
-        setMatchIndex((partidosPorGrupo[prevGrupo]?.length ?? 1) - 1)
-      }
-    }
+    if (matchIndex > 0) setMatchIndex(i => i - 1)
   }
 
   if (loading) return (
@@ -163,8 +149,7 @@ export default function PronosticosPage() {
   const pron = pronosticos[partido.id]
   const tienePronos = sc.local !== '' && sc.visitante !== ''
   const yaGuardado = savedIds.has(partido.id) || (!!pron && sc.local === String(pron.goles_local) && sc.visitante === String(pron.goles_visitante))
-  const esUltimoPartido = grupoActivo === 'L' && matchIndex === matchsActivos.length - 1
-  const esUltimoDelGrupo = matchIndex === matchsActivos.length - 1
+  const esUltimo = matchIndex === partidos.length - 1
   const countdown = formatearCountdown(partido.fecha)
 
   return (
@@ -192,30 +177,20 @@ export default function PronosticosPage() {
             </Link>
           </div>
         </div>
-
-        {/* Tabs grupos A-L */}
-        <div className="max-w-lg mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {GRUPOS_TORNEO.map(g => (
-            <button key={g} onClick={() => setGrupoActivo(g)}
-              className={`flex-shrink-0 px-3 py-1 rounded-md text-sm font-semibold transition-colors ${
-                grupoActivo === g ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}>
-              {g}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Progreso dentro del grupo */}
+      {/* Progreso global */}
       <div className="max-w-lg mx-auto w-full px-4 pt-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Grupo {grupoActivo}</span>
-          <span className="text-slate-500 text-xs">{matchIndex + 1} de {matchsActivos.length}</span>
+          <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
+            Grupo {partido.grupo_torneo}
+          </span>
+          <span className="text-slate-500 text-xs">{matchIndex + 1} de {partidos.length}</span>
         </div>
         <div className="w-full bg-slate-800 rounded-full h-1 mb-4">
           <div
             className="bg-emerald-500 h-1 rounded-full transition-all duration-300"
-            style={{ width: `${((matchIndex + 1) / matchsActivos.length) * 100}%` }}
+            style={{ width: `${((matchIndex + 1) / partidos.length) * 100}%` }}
           />
         </div>
       </div>
@@ -254,13 +229,11 @@ export default function PronosticosPage() {
 
           {/* Equipos y marcador */}
           <div className="flex items-center gap-3">
-            {/* Local */}
             <div className="flex-1 flex flex-col items-center gap-2">
               <Flag equipo={partido.equipo_local} />
               <span className="text-white font-semibold text-sm text-center leading-tight">{partido.equipo_local}</span>
             </div>
 
-            {/* Inputs / resultado */}
             <div className="flex flex-col items-center gap-2 flex-shrink-0">
               {jugado ? (
                 <div className="flex items-center gap-2">
@@ -275,7 +248,6 @@ export default function PronosticosPage() {
                   <span className="text-slate-400 font-bold text-3xl w-10 text-center">{pron ? String(pron.goles_visitante) : '?'}</span>
                 </div>
               ) : cerrado ? (
-                // Cerrado pero no empezó: mostrar pronóstico o vacío
                 <div className="flex flex-col items-center gap-1">
                   <div className="flex items-center gap-2">
                     <span className={`font-bold text-3xl w-10 text-center ${pron ? 'text-slate-400' : 'text-slate-700'}`}>
@@ -286,9 +258,7 @@ export default function PronosticosPage() {
                       {pron ? String(pron.goles_visitante) : '-'}
                     </span>
                   </div>
-                  {!pron && (
-                    <span className="text-slate-600 text-xs">Sin pronóstico</span>
-                  )}
+                  {!pron && <span className="text-slate-600 text-xs">Sin pronóstico</span>}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -315,7 +285,6 @@ export default function PronosticosPage() {
               )}
             </div>
 
-            {/* Visitante */}
             <div className="flex-1 flex flex-col items-center gap-2">
               <Flag equipo={partido.equipo_visitante} />
               <span className="text-white font-semibold text-sm text-center leading-tight">{partido.equipo_visitante}</span>
@@ -327,7 +296,7 @@ export default function PronosticosPage() {
         <div className="flex gap-3 mt-4 pb-8">
           <button
             onClick={irAnterior}
-            disabled={grupoActivo === 'A' && matchIndex === 0}
+            disabled={matchIndex === 0}
             className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 rounded-xl transition-colors disabled:opacity-30 text-sm">
             ← Anterior
           </button>
@@ -343,19 +312,15 @@ export default function PronosticosPage() {
 
           <button
             onClick={irSiguiente}
-            disabled={saving || esUltimoPartido}
+            disabled={saving || esUltimo}
             className={`flex-1 font-semibold py-4 rounded-xl transition-colors text-sm ${
-              esUltimoPartido
+              esUltimo
                 ? 'bg-slate-800 text-slate-500'
                 : tienePronos && !yaGuardado && !cerrado && !empezó && !jugado
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                   : 'bg-slate-800 hover:bg-slate-700 text-white'
             }`}>
-            {saving ? 'Guardando...' :
-              esUltimoPartido ? '¡Listo! 🏆' :
-              esUltimoDelGrupo ? `Grupo ${GRUPOS_TORNEO[GRUPOS_TORNEO.indexOf(grupoActivo) + 1]} →` :
-              tienePronos && !yaGuardado && !cerrado && !empezó && !jugado ? 'Guardar y seguir →' : 'Siguiente →'
-            }
+            {saving ? 'Guardando...' : esUltimo ? '¡Listo! 🏆' : tienePronos && !yaGuardado && !cerrado && !empezó && !jugado ? 'Guardar y seguir →' : 'Siguiente →'}
           </button>
         </div>
       </div>
