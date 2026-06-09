@@ -35,3 +35,29 @@ export function partidoYaEmpezó(fecha: string | null): boolean {
   if (!fecha) return false
   return new Date(fecha) <= new Date()
 }
+
+// Pronósticos cerrados 24h antes del partido
+export function partidoCerrado(fecha: string | null): boolean {
+  if (!fecha) return false
+  return Date.now() >= new Date(fecha).getTime() - 24 * 60 * 60 * 1000
+}
+
+// Partido actualmente en juego (entre el inicio y 2h después)
+export function partidoEnVivo(fecha: string | null): boolean {
+  if (!fecha) return false
+  const inicio = new Date(fecha).getTime()
+  const ahora = Date.now()
+  return ahora >= inicio && ahora <= inicio + 2 * 60 * 60 * 1000
+}
+
+// Texto de countdown hasta el cierre (null si faltan más de 24h)
+export function formatearCountdown(fecha: string | null): string | null {
+  if (!fecha) return null
+  const deadline = new Date(fecha).getTime() - 24 * 60 * 60 * 1000
+  const diff = deadline - Date.now()
+  if (diff <= 0 || diff > 24 * 60 * 60 * 1000) return null
+  const h = Math.floor(diff / (1000 * 60 * 60))
+  const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  if (h > 0) return `Cierra en ${h}h ${m}m`
+  return `Cierra en ${m}m`
+}

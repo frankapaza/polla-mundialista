@@ -1,16 +1,83 @@
-import { supabase } from '@/lib/supabase'
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import type { Grupo, Participante, Pronostico } from '@/lib/types'
+import { supabase } from '@/lib/supabase'
+import { partidoEnVivo } from '@/lib/utils'
+import type { Grupo, Participante, Pronostico, Partido } from '@/lib/types'
 
-interface Props { params: Promise<{ codigo: string }> }
+type RankingRow = Participante & { total: number; exactos: number; ganadores: number }
 
-export const revalidate = 60
+export default function RankingPage() {
+  const params = useParams()
+  const codigoUpper = (params.codigo as string).toUpperCase()
 
-export default async function RankingPage({ params }: Props) {
-  const { codigo } = await params
-  const codigoUpper = codigo.toUpperCase()
+  const [grupo, setGrupo] = useState<Grupo | null>(null)
+  const [ranking, setRanking] = useState<RankingRow[]>([])
+  const [partidosVivos, setPartidosVivos] = useState<Partido[]>([])
+  const [loading, setLoading] = useState(true)
+  const [flashActualizado, setFlashActualizado] = useState(false)
 
-  const { data: grupo } = await supabase.from('grupos').select().eq('codigo', codigoUpper).single()
+  const cargarRanking = useCallback(async () => {
+    const { data: g } = await supabase.from('grupos').select().eq('codigo', codigoUpper).single()
+    if (!g) return
+
+    const { data: participantes } = await supabase
+      .from('participantes').select().eq('grupo_id', g.id).order('created_at')
+
+    const ids = (participantes ?? []).map((p: Participante) => p.id)
+
+    const [{ data: pronos }, { data: partidos }] = await Promise.all([
+      ids.length > 0
+        ? supabase.from('pronosticos').select().in('participante_id', ids)
+        : Promise.resolve({ data: [] }),
+      supabase.from('partidos').select().eq('fase', 'grupos').order('fecha'),
+    ])
+
+    const vivos = (partidos ?? []).filter((p: Partido) =>
+      p.fecha && partidoEnVivo(p.fecha) && p.goles_local === null
+    )
+    setPartidosVivos(vivos as Partido[])
+
+    const calc = (participantes ?? []).map((p: Participante) => {
+      const prs = (pronos ?? []).filter((pr: Pronostico) => pr.participante_id === p.id)
+      const total = prs.reduce((s: number, pr: Pronostico) => s + (pr.puntos ?? 0), 0)
+      const exactos = prs.filter((pr: Pronostico) => pr.puntos === 3).length
+      const ganadores = prs.filter((pr: Pronostico) => pr.puntos === 1).length
+      return { ...p, total, exactos, ganadores }
+    }).sort((a: RankingRow, b: RankingRow) => b.total - a.total)
+
+    setGrupo(g as Grupo)
+    setRanking(calc)
+    setLoading(false)
+    setFlashActualizado(true)
+    setTimeout(() => setFlashActualizado(false), 1500)
+  }, [codigoUpper])
+
+  useEffect(() => {
+    cargarRanking()
+
+    const channel = supabase
+      .channel(`ranking-${codigoUpper}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pronosticos' }, () => cargarRanking())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, () => cargarRanking())
+      .subscribe()
+
+    // Polling fallback cada 30s
+    const interval = setInterval(cargarRanking, 30_000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [cargarRanking])
+
+  if (loading) return (
+    <main className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="text-slate-400">Cargando ranking...</div>
+    </main>
+  )
 
   if (!grupo) return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950">
@@ -21,29 +88,14 @@ export default async function RankingPage({ params }: Props) {
     </main>
   )
 
-  const { data: participantes } = await supabase
-    .from('participantes').select().eq('grupo_id', grupo.id).order('created_at')
-
-  const { data: pronosticos } = await supabase
-    .from('pronosticos')
-    .select()
-    .in('participante_id', (participantes ?? []).map((p: Participante) => p.id))
-
-  const ranking = (participantes ?? []).map((p: Participante) => {
-    const pronos = (pronosticos ?? []).filter((pr: Pronostico) => pr.participante_id === p.id)
-    const total    = pronos.reduce((s: number, pr: Pronostico) => s + (pr.puntos ?? 0), 0)
-    const exactos  = pronos.filter((pr: Pronostico) => pr.puntos === 3).length
-    const ganadores = pronos.filter((pr: Pronostico) => pr.puntos === 1).length
-    return { ...p, total, exactos, ganadores }
-  }).sort((a: { total: number }, b: { total: number }) => b.total - a.total)
-
-  const g = grupo as Grupo
-  const hayPuntos = ranking.some((r: { total: number }) => r.total > 0)
+  const g = grupo
+  const hayPuntos = ranking.some(r => r.total > 0)
   const inscripcionesCerradas = g.cierre_inscripciones ? new Date(g.cierre_inscripciones) <= new Date() : false
   const tieneCosto = g.costo_inscripcion > 0
-  const totalPagaron = (participantes ?? []).filter((p: Participante) => p.pago).length
-  const totalPendientes = (participantes ?? []).length - totalPagaron
+  const totalPagaron = ranking.filter(r => r.pago).length
+  const totalPendientes = ranking.length - totalPagaron
   const recaudado = totalPagaron * g.costo_inscripcion
+  const hayPartidosVivos = partidosVivos.length > 0
 
   return (
     <main className="min-h-screen bg-slate-950 pb-16">
@@ -73,6 +125,29 @@ export default async function RankingPage({ params }: Props) {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 pt-6">
+
+        {/* Banner partidos en vivo */}
+        {hayPartidosVivos && (
+          <div className="bg-red-900/30 border border-red-700/50 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+            <span className="text-red-400 animate-pulse text-lg">🔴</span>
+            <div>
+              <p className="text-red-300 font-semibold text-sm">Partidos en juego ahora</p>
+              <p className="text-red-400/70 text-xs">
+                {partidosVivos.map(p => `${p.equipo_local} vs ${p.equipo_visitante}`).join(' · ')}
+              </p>
+            </div>
+            <span className={`ml-auto text-xs font-medium transition-all duration-500 ${flashActualizado ? 'text-emerald-400' : 'text-slate-600'}`}>
+              ↻ En vivo
+            </span>
+          </div>
+        )}
+
+        {/* Flash actualización silenciosa */}
+        {!hayPartidosVivos && flashActualizado && (
+          <div className="text-center text-xs text-emerald-500 mb-2 transition-opacity">
+            ↻ Actualizado
+          </div>
+        )}
 
         {/* Info del grupo */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 mb-5">
@@ -124,8 +199,8 @@ export default async function RankingPage({ params }: Props) {
               </p>
             )}
 
-            {ranking.map((p: Participante & { total: number; exactos: number; ganadores: number }, i: number) => (
-              <div key={p.id} className={`bg-slate-900 border rounded-xl px-4 py-3.5 flex items-center gap-3 ${
+            {ranking.map((p, i) => (
+              <div key={p.id} className={`bg-slate-900 border rounded-xl px-4 py-3.5 flex items-center gap-3 transition-all ${
                 i === 0 && hayPuntos ? 'border-amber-600/60' :
                 i === 1 && hayPuntos ? 'border-slate-500/60' :
                 i === 2 && hayPuntos ? 'border-amber-800/60' : 'border-slate-800'

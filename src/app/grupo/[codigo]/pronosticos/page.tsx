@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { formatearFecha, partidoYaEmpezó } from '@/lib/utils'
+import { formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown } from '@/lib/utils'
 import { flagUrl } from '@/lib/flags'
 import type { Partido, Pronostico, Grupo, Participante } from '@/lib/types'
 
@@ -34,6 +34,13 @@ export default function PronosticosPage() {
   const [grupoActivo, setGrupoActivo] = useState('A')
   const [matchIndex, setMatchIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+  // Ticker para actualizar countdowns cada minuto
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60_000)
+    return () => clearInterval(interval)
+  }, [])
 
   const cargarDatos = useCallback(async () => {
     const stored = localStorage.getItem(STORAGE_KEY(codigo))
@@ -65,8 +72,6 @@ export default function PronosticosPage() {
   }, [codigo, router])
 
   useEffect(() => { cargarDatos() }, [cargarDatos])
-
-  // Resetear índice al cambiar de grupo
   useEffect(() => { setMatchIndex(0) }, [grupoActivo])
 
   function setScore(partidoId: string, side: 'local' | 'visitante', val: string) {
@@ -117,13 +122,12 @@ export default function PronosticosPage() {
   const inscripcionesCerradas = cierreInscripciones ? new Date(cierreInscripciones) <= new Date() : false
 
   async function irSiguiente() {
-    if (partido && !partidoYaEmpezó(partido.fecha)) {
+    if (partido && !partidoCerrado(partido.fecha)) {
       await guardarPronostico(partido)
     }
     if (matchIndex < matchsActivos.length - 1) {
       setMatchIndex(i => i + 1)
     } else {
-      // Pasar al siguiente grupo
       const idx = GRUPOS_TORNEO.indexOf(grupoActivo)
       if (idx < GRUPOS_TORNEO.length - 1) {
         setGrupoActivo(GRUPOS_TORNEO[idx + 1])
@@ -152,6 +156,7 @@ export default function PronosticosPage() {
 
   if (!partido) return null
 
+  const cerrado = partidoCerrado(partido.fecha)
   const empezó = partidoYaEmpezó(partido.fecha)
   const jugado = partido.goles_local !== null
   const sc = scores[partido.id] ?? { local: '', visitante: '' }
@@ -160,6 +165,7 @@ export default function PronosticosPage() {
   const yaGuardado = savedIds.has(partido.id) || (!!pron && sc.local === String(pron.goles_local) && sc.visitante === String(pron.goles_visitante))
   const esUltimoPartido = grupoActivo === 'L' && matchIndex === matchsActivos.length - 1
   const esUltimoDelGrupo = matchIndex === matchsActivos.length - 1
+  const countdown = formatearCountdown(partido.fecha)
 
   return (
     <main className="min-h-screen bg-slate-950 flex flex-col">
@@ -217,20 +223,33 @@ export default function PronosticosPage() {
       {/* Tarjeta del partido */}
       <div className="flex-1 flex flex-col max-w-lg mx-auto w-full px-4">
         <div className={`bg-slate-900 border rounded-2xl p-6 flex flex-col gap-5 ${
-          jugado ? 'border-slate-700' : empezó ? 'border-amber-700/50' : 'border-slate-800'
+          jugado ? 'border-slate-700' :
+          empezó ? 'border-amber-700/50' :
+          cerrado ? 'border-slate-700' :
+          countdown ? 'border-amber-600/40' : 'border-slate-800'
         }`}>
 
-          {/* Fecha y estado */}
+          {/* Fecha, estado y countdown */}
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>{formatearFecha(partido.fecha)}</span>
-            {jugado && pron && (
-              <span className={`font-bold px-2 py-0.5 rounded ${
-                pron.puntos === 3 ? 'bg-emerald-900 text-emerald-300' :
-                pron.puntos === 1 ? 'bg-blue-900 text-blue-300' :
-                'bg-red-900/50 text-red-400'
-              }`}>{pron.puntos} pts</span>
-            )}
-            {empezó && !jugado && <span className="text-amber-400 font-medium">En juego</span>}
+            <div className="flex items-center gap-2">
+              {jugado && pron && (
+                <span className={`font-bold px-2 py-0.5 rounded ${
+                  pron.puntos === 3 ? 'bg-emerald-900 text-emerald-300' :
+                  pron.puntos === 1 ? 'bg-blue-900 text-blue-300' :
+                  'bg-red-900/50 text-red-400'
+                }`}>{pron.puntos} pts</span>
+              )}
+              {empezó && !jugado && <span className="text-amber-400 font-medium animate-pulse">🔴 En juego</span>}
+              {cerrado && !empezó && !jugado && (
+                <span className="text-slate-500 font-medium">🔒 Cerrado</span>
+              )}
+              {!cerrado && countdown && (
+                <span className="text-amber-400 font-semibold bg-amber-900/30 px-2 py-0.5 rounded">
+                  ⏰ {countdown}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Equipos y marcador */}
@@ -255,6 +274,22 @@ export default function PronosticosPage() {
                   <span className="text-slate-500 text-xl">-</span>
                   <span className="text-slate-400 font-bold text-3xl w-10 text-center">{pron ? String(pron.goles_visitante) : '?'}</span>
                 </div>
+              ) : cerrado ? (
+                // Cerrado pero no empezó: mostrar pronóstico o vacío
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold text-3xl w-10 text-center ${pron ? 'text-slate-400' : 'text-slate-700'}`}>
+                      {pron ? String(pron.goles_local) : '-'}
+                    </span>
+                    <span className="text-slate-500 text-xl">-</span>
+                    <span className={`font-bold text-3xl w-10 text-center ${pron ? 'text-slate-400' : 'text-slate-700'}`}>
+                      {pron ? String(pron.goles_visitante) : '-'}
+                    </span>
+                  </div>
+                  {!pron && (
+                    <span className="text-slate-600 text-xs">Sin pronóstico</span>
+                  )}
+                </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <input type="text" inputMode="numeric" value={sc.local}
@@ -271,7 +306,7 @@ export default function PronosticosPage() {
               {jugado && pron && (
                 <span className="text-slate-500 text-xs">Mi pronóstico: {pron.goles_local}-{pron.goles_visitante}</span>
               )}
-              {!empezó && !jugado && (
+              {!empezó && !cerrado && (
                 <span className={`text-xs font-medium transition-colors ${
                   yaGuardado ? 'text-emerald-400' : tienePronos ? 'text-slate-400' : 'text-slate-600'
                 }`}>
@@ -297,7 +332,7 @@ export default function PronosticosPage() {
             ← Anterior
           </button>
 
-          {!empezó && !jugado && tienePronos && !yaGuardado && (
+          {!empezó && !cerrado && tienePronos && !yaGuardado && (
             <button
               onClick={() => guardarPronostico(partido)}
               disabled={saving}
@@ -312,14 +347,14 @@ export default function PronosticosPage() {
             className={`flex-1 font-semibold py-4 rounded-xl transition-colors text-sm ${
               esUltimoPartido
                 ? 'bg-slate-800 text-slate-500'
-                : tienePronos && !yaGuardado && !empezó && !jugado
+                : tienePronos && !yaGuardado && !cerrado && !empezó && !jugado
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                   : 'bg-slate-800 hover:bg-slate-700 text-white'
             }`}>
             {saving ? 'Guardando...' :
               esUltimoPartido ? '¡Listo! 🏆' :
               esUltimoDelGrupo ? `Grupo ${GRUPOS_TORNEO[GRUPOS_TORNEO.indexOf(grupoActivo) + 1]} →` :
-              tienePronos && !yaGuardado && !empezó && !jugado ? 'Guardar y seguir →' : 'Siguiente →'
+              tienePronos && !yaGuardado && !cerrado && !empezó && !jugado ? 'Guardar y seguir →' : 'Siguiente →'
             }
           </button>
         </div>
