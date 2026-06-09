@@ -64,6 +64,14 @@ export default function PronosticosPage() {
       ])
 
     if (!grupoData) { router.replace(`/grupo/${codigo}`); return }
+
+    // Session repair: if participanteId in localStorage no longer exists in DB, clear and re-register
+    if (!particicData) {
+      localStorage.removeItem(STORAGE_KEY(codigo))
+      router.replace(`/grupo/${codigo}`)
+      return
+    }
+
     setGrupo(grupoData as Grupo)
     setParticipante(particicData as Participante)
 
@@ -444,6 +452,12 @@ export default function PronosticosPage() {
             {saving ? 'Guardando...' : esUltimo ? '¡Listo! 🏆' : tienePronos && !yaGuardado && !cerrado && !empezó && !jugado ? 'Guardar y seguir →' : 'Siguiente →'}
           </button>
         </div>
+
+        <button
+          onClick={() => { localStorage.removeItem(STORAGE_KEY(codigo)); router.replace(`/grupo/${codigo}`) }}
+          className="block w-full text-center text-slate-700 hover:text-slate-500 text-xs py-3 transition-colors">
+          ¿No sos {participante?.nombre?.split(' ')[0]}? Cambiar usuario
+        </button>
       </div>
     </main>
   )
