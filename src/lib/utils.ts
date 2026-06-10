@@ -36,10 +36,13 @@ export function partidoYaEmpezó(fecha: string | null): boolean {
   return new Date(fecha) <= new Date()
 }
 
-// Pronósticos cerrados 24h antes del partido
+// Cuánto antes del partido se cierran los pronósticos (1 hora)
+const CIERRE_ANTES_MS = 60 * 60 * 1000
+
+// Pronósticos cerrados 1h antes del partido
 export function partidoCerrado(fecha: string | null): boolean {
   if (!fecha) return false
-  return Date.now() >= new Date(fecha).getTime() - 24 * 60 * 60 * 1000
+  return Date.now() >= new Date(fecha).getTime() - CIERRE_ANTES_MS
 }
 
 // Partido actualmente en juego (entre el inicio y 2h después)
@@ -53,7 +56,7 @@ export function partidoEnVivo(fecha: string | null): boolean {
 // Texto de countdown hasta el cierre (null si faltan más de 48h)
 export function formatearCountdown(fecha: string | null): string | null {
   if (!fecha) return null
-  const deadline = new Date(fecha).getTime() - 24 * 60 * 60 * 1000
+  const deadline = new Date(fecha).getTime() - CIERRE_ANTES_MS
   const diff = deadline - Date.now()
   if (diff <= 0 || diff > 48 * 60 * 60 * 1000) return null
   const h = Math.floor(diff / (1000 * 60 * 60))
@@ -68,7 +71,7 @@ export function formatearCountdown(fecha: string | null): string | null {
 export type SemaforoColor = 'green' | 'yellow' | 'red' | 'closed' | 'open'
 export function semaforoColor(fecha: string | null): SemaforoColor {
   if (!fecha) return 'open'
-  const deadline = new Date(fecha).getTime() - 24 * 60 * 60 * 1000
+  const deadline = new Date(fecha).getTime() - CIERRE_ANTES_MS
   const diff = deadline - Date.now()
   if (diff <= 0) return 'closed'
   if (diff < 60 * 60 * 1000) return 'red'          // < 1h
