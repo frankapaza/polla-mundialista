@@ -78,6 +78,7 @@ export default function GrupoPage() {
 
   const [grupo, setGrupo] = useState<Grupo | null>(null)
   const [notFound, setNotFound] = useState(false)
+  const [modo, setModo] = useState<'login' | 'registro'>('login')
   const [nombre, setNombre] = useState('')
   const [documento, setDocumento] = useState('')
   const [campeon, setCampeon] = useState('')
@@ -117,6 +118,34 @@ export default function GrupoPage() {
         setGrupo(data as Grupo)
       })
   }, [codigo, router])
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!documento.trim()) { setError('Ingresá tu número de documento'); return }
+
+    setLoading(true)
+    setError('')
+
+    const { data: existing } = await supabase
+      .from('participantes')
+      .select()
+      .eq('grupo_id', grupo!.id)
+      .eq('documento', documento.trim())
+      .maybeSingle()
+
+    if (!existing) {
+      setError('No encontramos ese documento en este grupo. ¿Es tu primera vez? Registrate abajo.')
+      setLoading(false)
+      return
+    }
+
+    localStorage.setItem(STORAGE_KEY(codigo), JSON.stringify({
+      participanteId: existing.id,
+      nombre: existing.nombre,
+      grupoId: grupo!.id,
+    }))
+    router.push(`/grupo/${codigo}/pronosticos`)
+  }
 
   async function handleRegistro(e: React.FormEvent) {
     e.preventDefault()
@@ -208,63 +237,119 @@ export default function GrupoPage() {
           {esNuevo && <CompartirWhatsApp grupo={grupo} codigo={codigo} />}
         </div>
 
-        {/* Formulario de registro */}
-        <form onSubmit={handleRegistro} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white text-center">
-            Registrate para jugar
-          </h2>
+        {/* Formulario de login (entrar con DNI) */}
+        {modo === 'login' ? (
+          <form onSubmit={handleLogin} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white text-center">
+              Ingresá a tus pronósticos
+            </h2>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Nombre completo
-            </label>
-            <input
-              type="text"
-              value={nombre}
-              onChange={e => { setNombre(e.target.value); setError('') }}
-              placeholder="Ej: Juan García"
-              maxLength={80}
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Número de documento (DNI/Pasaporte)
+              </label>
+              <input
+                type="text"
+                value={documento}
+                onChange={e => { setDocumento(e.target.value); setError('') }}
+                placeholder="Ej: 30123456"
+                maxLength={20}
+                autoFocus
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Número de documento (DNI/Pasaporte)
-            </label>
-            <input
-              type="text"
-              value={documento}
-              onChange={e => { setDocumento(e.target.value); setError('') }}
-              placeholder="Ej: 30123456"
-              maxLength={20}
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+            {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              🏆 ¿Quién ganará el Mundial? <span className="text-slate-500 font-normal">(opcional)</span>
-            </label>
-            <select
-              value={campeon}
-              onChange={e => setCampeon(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              <option value="">— Elige un campeón —</option>
-              {EQUIPOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
-            </select>
-          </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Ingresando...' : 'Ingresar'}
+            </button>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+            <p className="text-center text-sm text-slate-400">
+              ¿Es tu primera vez?{' '}
+              <button
+                type="button"
+                onClick={() => { setModo('registro'); setError('') }}
+                className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+              >
+                Registrate acá
+              </button>
+            </p>
+          </form>
+        ) : (
+          /* Formulario de registro */
+          <form onSubmit={handleRegistro} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white text-center">
+              Registrate para jugar
+            </h2>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Registrando...' : 'Ingresar y hacer pronósticos'}
-          </button>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Nombre completo
+              </label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={e => { setNombre(e.target.value); setError('') }}
+                placeholder="Ej: Juan García"
+                maxLength={80}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Número de documento (DNI/Pasaporte)
+              </label>
+              <input
+                type="text"
+                value={documento}
+                onChange={e => { setDocumento(e.target.value); setError('') }}
+                placeholder="Ej: 30123456"
+                maxLength={20}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                🏆 ¿Quién ganará el Mundial? <span className="text-slate-500 font-normal">(opcional)</span>
+              </label>
+              <select
+                value={campeon}
+                onChange={e => setCampeon(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="">— Elige un campeón —</option>
+                {EQUIPOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+              </select>
+            </div>
+
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Registrando...' : 'Ingresar y hacer pronósticos'}
+            </button>
+
+            <p className="text-center text-sm text-slate-400">
+              ¿Ya estás registrado?{' '}
+              <button
+                type="button"
+                onClick={() => { setModo('login'); setError('') }}
+                className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+              >
+                Ingresá con tu DNI
+              </button>
+            </p>
+          </form>
+        )}
 
         <div className="mt-4 text-center">
           <Link

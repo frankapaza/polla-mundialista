@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown, semaforoColor } from '@/lib/utils'
+import { formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown, semaforoColor, fechaCierre } from '@/lib/utils'
 import { flagUrl } from '@/lib/flags'
 import type { Partido, Pronostico, Grupo, Participante } from '@/lib/types'
 
@@ -229,6 +229,11 @@ export default function PronosticosPage() {
               className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
               Ranking
             </Link>
+            <button
+              onClick={() => { localStorage.removeItem(STORAGE_KEY(codigo)); router.replace(`/grupo/${codigo}`) }}
+              className="bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-red-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+              Salir
+            </button>
           </div>
         </div>
       </div>
@@ -344,12 +349,19 @@ export default function PronosticosPage() {
             </div>
           </div>
 
-          {/* Badge semáforo con countdown */}
-          {!cerrado && !empezó && !jugado && countdown && (
-            <div className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold ${estilos.badge}`}>
-              <span className={`w-2 h-2 rounded-full ${estilos.dot}`} />
-              ⏰ Cierra en {countdown}
-            </div>
+          {/* Badge de cierre: contador en vivo si falta <48h, si no fecha fija */}
+          {!cerrado && !empezó && !jugado && (
+            countdown ? (
+              <div className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold ${estilos.badge}`}>
+                <span className={`w-2 h-2 rounded-full ${estilos.dot}`} />
+                ⏰ Cierra en {countdown}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                <span className="w-2 h-2 rounded-full bg-slate-500" />
+                🔒 Cierra: {fechaCierre(partido.fecha)}
+              </div>
+            )
           )}
 
           {/* Equipos y marcador */}

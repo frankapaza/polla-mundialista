@@ -45,6 +45,19 @@ export function partidoCerrado(fecha: string | null): boolean {
   return Date.now() >= new Date(fecha).getTime() - CIERRE_ANTES_MS
 }
 
+// Fecha/hora exacta en que se cierran los pronósticos (1h antes del partido)
+export function fechaCierre(fecha: string | null): string {
+  if (!fecha) return ''
+  return new Date(new Date(fecha).getTime() - CIERRE_ANTES_MS).toLocaleString('es-PE', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Lima',
+  })
+}
+
 // Partido actualmente en juego (entre el inicio y 2h después)
 export function partidoEnVivo(fecha: string | null): boolean {
   if (!fecha) return false

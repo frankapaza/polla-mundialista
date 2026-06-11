@@ -86,6 +86,7 @@ export default function AdminGrupoPage() {
 
   // Pagos
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
+  const [eliminando, setEliminando] = useState<Record<string, boolean>>({})
 
   // Resultados
   const [resultados, setResultados] = useState<Record<string, { local: string; visitante: string }>>({})
@@ -198,6 +199,28 @@ export default function AdminGrupoPage() {
       )
     }
     setToggling(prev => ({ ...prev, [participante.id]: false }))
+  }
+
+  async function eliminarParticipante(participante: Participante) {
+    const ok = window.confirm(
+      `¿Eliminar a ${participante.nombre} (Doc: ${participante.documento})?\n\nSe borrarán también todos sus pronósticos. Esta acción no se puede deshacer.`
+    )
+    if (!ok) return
+
+    setEliminando(prev => ({ ...prev, [participante.id]: true }))
+
+    // Borrar primero los pronósticos (FK) y luego el participante
+    await supabase.from('pronosticos').delete().eq('participante_id', participante.id)
+    const { error } = await supabase.from('participantes').delete().eq('id', participante.id)
+
+    if (error) {
+      setEliminando(prev => ({ ...prev, [participante.id]: false }))
+      window.alert('No se pudo eliminar. Intentá de nuevo.')
+      return
+    }
+
+    setParticipantes(prev => prev.filter(p => p.id !== participante.id))
+    setEliminando(prev => { const n = { ...prev }; delete n[participante.id]; return n })
   }
 
   function setResultado(partidoId: string, side: 'local' | 'visitante', val: string) {
@@ -414,6 +437,13 @@ export default function AdminGrupoPage() {
                     ) : (
                       <span className="text-slate-600 text-xs">Sin costo</span>
                     )}
+                    <button
+                      onClick={() => eliminarParticipante(p)}
+                      disabled={eliminando[p.id]}
+                      title="Eliminar participante"
+                      className="flex-shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-500 hover:bg-red-900/60 hover:text-red-300 transition-colors disabled:opacity-50">
+                      {eliminando[p.id] ? '...' : '🗑'}
+                    </button>
                   </div>
                 ))}
               </div>

@@ -1,14 +1,12 @@
-import { supabase } from '@/lib/supabase'
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 import { flagUrl } from '@/lib/flags'
+import { partidoCerrado } from '@/lib/utils'
 import type { Grupo, Participante, Partido, Pronostico } from '@/lib/types'
-
-interface Props {
-  params: Promise<{ codigo: string }>
-  searchParams: Promise<{ admin?: string }>
-}
-
-export const revalidate = 60
 
 const GRUPOS_TORNEO = ['A','B','C','D','E','F','G','H','I','J','K','L']
 
@@ -27,24 +25,109 @@ function PuntosBadge({ puntos }: { puntos: number | null | undefined }) {
   return <span className="text-red-500 font-bold text-xs">✗</span>
 }
 
-export default async function DashboardPage({ params, searchParams }: Props) {
-  const { codigo } = await params
-  const { admin } = await searchParams
-  const codigoUpper = codigo.toUpperCase()
+type ParticipanteConTotal = Participante & { total: number }
 
-  const { data: grupo } = await supabase.from('grupos').select().eq('codigo', codigoUpper).single()
+export default function DashboardPage() {
+  const params = useParams()
+  const codigoUpper = (params.codigo as string).toUpperCase()
 
-  if (!grupo) return (
+  const [esAdmin, setEsAdmin] = useState(false)
+  const [grupo, setGrupo] = useState<Grupo | null>(null)
+  const [notFound, setNotFound] = useState(false)
+  const [bloqueado, setBloqueado] = useState(false)
+  const [participantes, setParticipantes] = useState<ParticipanteConTotal[]>([])
+  const [partidos, setPartidos] = useState<Partido[]>([])
+  const [pronosIdx, setPronosIdx] = useState<Record<string, Record<string, Pronostico>>>({})
+  const [loading, setLoading] = useState(true)
+
+  const cargar = useCallback(async () => {
+    // Admin = sesión real del panel (misma que protege /admin). Ya no se confía en ?admin=1.
+    const admin = typeof window !== 'undefined' && sessionStorage.getItem('polla_admin') === 'true'
+    setEsAdmin(admin)
+
+    const { data: g } = await supabase.from('grupos').select().eq('codigo', codigoUpper).single()
+    if (!g) { setNotFound(true); setLoading(false); return }
+
+    const grupoData = g as Grupo
+    setGrupo(grupoData)
+
+    const inscripcionesCerradas = grupoData.cierre_inscripciones
+      ? new Date(grupoData.cierre_inscripciones) <= new Date()
+      : false
+
+    if (!inscripcionesCerradas && !admin) {
+      setBloqueado(true)
+      setLoading(false)
+      return
+    }
+    setBloqueado(false)
+
+    const [{ data: parts }, { data: mats }] = await Promise.all([
+      supabase.from('participantes').select().eq('grupo_id', grupoData.id).order('created_at'),
+      supabase.from('partidos').select().eq('fase', 'grupos').order('numero_partido'),
+    ])
+
+    const partidosData = (mats ?? []) as Partido[]
+    setPartidos(partidosData)
+
+    const ids = (parts ?? []).map((p: Participante) => p.id)
+
+    // Para no-admins solo se traen los pronósticos de partidos ya bloqueados (revelados).
+    // Los de partidos futuros NO se descargan: el dato real nunca llega al navegador del jugador.
+    const idsRevelados = partidosData.filter(p => partidoCerrado(p.fecha)).map(p => p.id)
+
+    let pronos: Pronostico[] = []
+    if (ids.length > 0) {
+      if (admin) {
+        const { data } = await supabase.from('pronosticos').select().in('participante_id', ids)
+        pronos = (data ?? []) as Pronostico[]
+      } else if (idsRevelados.length > 0) {
+        const { data } = await supabase.from('pronosticos').select()
+          .in('participante_id', ids).in('partido_id', idsRevelados)
+        pronos = (data ?? []) as Pronostico[]
+      }
+    }
+
+    const idx: Record<string, Record<string, Pronostico>> = {}
+    for (const pr of pronos) {
+      if (!idx[pr.participante_id]) idx[pr.participante_id] = {}
+      idx[pr.participante_id][pr.partido_id] = pr
+    }
+    setPronosIdx(idx)
+
+    // Ordenar por puntos. Solo los partidos jugados otorgan puntos, y esos siempre
+    // están entre los revelados, así que el total es correcto también para no-admins.
+    const ordenados = (parts ?? []).map((p: Participante) => {
+      const total = Object.values(idx[p.id] ?? {}).reduce((s, pr) => s + (pr.puntos ?? 0), 0)
+      return { ...p, total }
+    }).sort((a: ParticipanteConTotal, b: ParticipanteConTotal) => b.total - a.total)
+    setParticipantes(ordenados)
+
+    setLoading(false)
+  }, [codigoUpper])
+
+  useEffect(() => {
+    cargar()
+    // Refresco periódico: actualiza puntos y revela partidos a medida que se cumplen las horas
+    const interval = setInterval(cargar, 60_000)
+    return () => clearInterval(interval)
+  }, [cargar])
+
+  if (loading) return (
+    <main className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="text-slate-400">Cargando dashboard...</div>
+    </main>
+  )
+
+  if (notFound) return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950">
       <Link href="/" className="text-emerald-400">Volver al inicio</Link>
     </main>
   )
 
   const g = grupo as Grupo
-  const inscripcionesCerradas = g.cierre_inscripciones ? new Date(g.cierre_inscripciones) <= new Date() : false
-  const esAdmin = admin === '1'
 
-  if (!inscripcionesCerradas && !esAdmin) return (
+  if (bloqueado) return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-slate-950 text-center">
       <div className="text-5xl mb-4">🔒</div>
       <h1 className="text-2xl font-bold text-white mb-2">Dashboard bloqueado</h1>
@@ -60,32 +143,8 @@ export default async function DashboardPage({ params, searchParams }: Props) {
     </main>
   )
 
-  const { data: participantes } = await supabase
-    .from('participantes').select().eq('grupo_id', g.id).order('created_at')
-
-  const { data: partidos } = await supabase
-    .from('partidos').select().eq('fase', 'grupos').order('numero_partido')
-
-  const { data: pronosticos } = await supabase
-    .from('pronosticos')
-    .select()
-    .in('participante_id', (participantes ?? []).map((p: Participante) => p.id))
-
-  // Índice de pronósticos: [participante_id][partido_id] → pronostico
-  const pronosIdx: Record<string, Record<string, Pronostico>> = {}
-  for (const pr of (pronosticos ?? []) as Pronostico[]) {
-    if (!pronosIdx[pr.participante_id]) pronosIdx[pr.participante_id] = {}
-    pronosIdx[pr.participante_id][pr.partido_id] = pr
-  }
-
-  // Calcular ranking para ordenar columnas por puntos
-  const participantesOrdenados = (participantes ?? [] as Participante[]).map((p: Participante) => {
-    const total = Object.values(pronosIdx[p.id] ?? {}).reduce((s, pr) => s + (pr.puntos ?? 0), 0)
-    return { ...p, total }
-  }).sort((a: { total: number }, b: { total: number }) => b.total - a.total)
-
-  const partidosPorGrupo = GRUPOS_TORNEO.reduce((acc, g) => {
-    acc[g] = (partidos ?? []).filter((p: Partido) => p.grupo_torneo === g)
+  const partidosPorGrupo = GRUPOS_TORNEO.reduce((acc, gt) => {
+    acc[gt] = partidos.filter((p: Partido) => p.grupo_torneo === gt)
     return acc
   }, {} as Record<string, Partido[]>)
 
@@ -95,7 +154,9 @@ export default async function DashboardPage({ params, searchParams }: Props) {
       <div className="bg-slate-950 border-b border-slate-800 sticky top-0 z-10">
         <div className="max-w-full px-4 py-4 flex items-center justify-between">
           <div>
-            <p className="text-slate-500 text-xs">Dashboard de pronósticos</p>
+            <p className="text-slate-500 text-xs">
+              Dashboard de pronósticos{esAdmin && <span className="text-amber-400"> · modo admin 👑</span>}
+            </p>
             <h1 className="text-white font-bold text-lg">{g.nombre}</h1>
           </div>
           <div className="flex gap-2">
@@ -108,8 +169,13 @@ export default async function DashboardPage({ params, searchParams }: Props) {
       </div>
 
       <div className="px-4 pt-6">
-        <p className="text-slate-500 text-xs mb-4">
-          {participantesOrdenados.length} participantes · 🎯 exacto · ✅ ganador/empate · ✗ incorrecto
+        <p className="text-slate-500 text-xs mb-2">
+          {participantes.length} participantes · 🎯 exacto · ✅ ganador/empate · ✗ incorrecto
+        </p>
+        <p className="text-slate-600 text-xs mb-4">
+          {esAdmin
+            ? '👑 Como admin ves todos los pronósticos. Los jugadores los ven recién 1h antes de cada partido.'
+            : 'Los pronósticos de los demás aparecen como * y se revelan 1h antes de que inicie cada partido.'}
         </p>
 
         {GRUPOS_TORNEO.map(grupoTorneo => {
@@ -134,7 +200,7 @@ export default async function DashboardPage({ params, searchParams }: Props) {
                       <th className="px-2 py-2 text-slate-500 font-medium whitespace-nowrap">
                         Resultado
                       </th>
-                      {participantesOrdenados.map((p: Participante & { total: number }) => (
+                      {participantes.map((p: ParticipanteConTotal) => (
                         <th key={p.id} className="px-2 py-2 text-slate-300 font-medium whitespace-nowrap max-w-[80px] truncate">
                           <div className="truncate max-w-[80px]" title={p.nombre}>
                             {p.nombre.split(' ')[0]}
@@ -147,6 +213,8 @@ export default async function DashboardPage({ params, searchParams }: Props) {
                   <tbody>
                     {matchs.map((partido: Partido, idx: number) => {
                       const jugado = partido.goles_local !== null
+                      // Se revela cuando se bloquea (1h antes del inicio) o si sos admin
+                      const revelar = partidoCerrado(partido.fecha) || esAdmin
                       return (
                         <tr key={partido.id}
                           className={`border-b border-slate-800/50 ${idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-900/60'}`}>
@@ -173,7 +241,16 @@ export default async function DashboardPage({ params, searchParams }: Props) {
                           </td>
 
                           {/* Pronósticos por participante */}
-                          {participantesOrdenados.map((p: Participante & { total: number }) => {
+                          {participantes.map((p: ParticipanteConTotal) => {
+                            if (!revelar) {
+                              // Oculto: se muestra * y el dato real ni se descargó al navegador
+                              return (
+                                <td key={p.id} className="px-2 py-2.5 text-center whitespace-nowrap">
+                                  <span className="text-slate-600 font-semibold tracking-widest"
+                                    title="Se revela 1h antes del partido">*</span>
+                                </td>
+                              )
+                            }
                             const pron = pronosIdx[p.id]?.[partido.id]
                             return (
                               <td key={p.id} className="px-2 py-2.5 text-center whitespace-nowrap">
