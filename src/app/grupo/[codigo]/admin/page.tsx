@@ -93,6 +93,7 @@ export default function AdminGrupoPage() {
   const [savingRes, setSavingRes] = useState<Record<string, boolean>>({})
   const [resMsg, setResMsg] = useState<Record<string, string>>({})
   const [waMensaje, setWaMensaje] = useState<string | null>(null)
+  const [waCopiado, setWaCopiado] = useState(false)
   const [grupoActivo, setGrupoActivo] = useState('A')
   const [faseResultados, setFaseResultados] = useState<'grupos' | 'eliminatoria'>('grupos')
   const [faseElim, setFaseElim] = useState('octavos')
@@ -247,33 +248,56 @@ export default function AdminGrupoPage() {
     }
 
     const { data: pronos } = await supabase.from('pronosticos').select().eq('partido_id', partido.id)
-    if (pronos && pronos.length > 0) {
-      for (const prono of pronos as Pronostico[]) {
-        const puntos = calcularPuntos(prono.goles_local, prono.goles_visitante, gl, gv)
-        await supabase.from('pronosticos')
-          .update({ puntos, updated_at: new Date().toISOString() }).eq('id', prono.id)
-      }
+
+    // Recalcular puntos de todos (los puntos no dependen del grupo)
+    for (const prono of (pronos ?? []) as Pronostico[]) {
+      const puntos = calcularPuntos(prono.goles_local, prono.goles_visitante, gl, gv)
+      await supabase.from('pronosticos')
+        .update({ puntos, updated_at: new Date().toISOString() }).eq('id', prono.id)
     }
 
+    // Solo los pronósticos de ESTE grupo (los partidos son globales entre grupos)
+    const idsGrupo = new Set(participantes.map(p => p.id))
+    const pronosGrupo = ((pronos ?? []) as Pronostico[]).filter(pr => idsGrupo.has(pr.participante_id))
+
     setSavingRes(prev => ({ ...prev, [partido.id]: false }))
-    setResMsg(prev => ({ ...prev, [partido.id]: `✅ ${pronos?.length ?? 0} pronósticos actualizados` }))
+    setResMsg(prev => ({ ...prev, [partido.id]: `✅ ${pronosGrupo.length} pronósticos actualizados` }))
     setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p))
 
-    // Generar mensaje WhatsApp con resultados
-    if (pronos && pronos.length > 0) {
-      const exactos = (pronos as Pronostico[]).filter(pr => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv) === 3)
-      const ganadores = (pronos as Pronostico[]).filter(pr => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv) === 1)
-      const fallaron = (pronos as Pronostico[]).filter(pr => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv) === 0)
-      const nombrePart = (id: string) => participantes.find(p => p.id === id)?.nombre ?? id
+    // Generar mensaje WhatsApp lindo (solo nombres del grupo)
+    if (pronosGrupo.length > 0) {
+      const nombrePart = (id: string) => participantes.find(p => p.id === id)?.nombre ?? 'Jugador'
+      const ptsDe = (pr: Pronostico) => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv)
+      const exactos = pronosGrupo.filter(pr => ptsDe(pr) === 3)
+      const ganadores = pronosGrupo.filter(pr => ptsDe(pr) === 1)
+      const fallaron = pronosGrupo.filter(pr => ptsDe(pr) === 0)
 
-      const lineas = [
-        `⚽ *${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}*`,
-        ``,
-        exactos.length > 0 ? `🎯 *Exactos (3pts):*\n${exactos.map(pr => `• ${nombrePart(pr.participante_id)} (${pr.goles_local}-${pr.goles_visitante})`).join('\n')}` : '',
-        ganadores.length > 0 ? `✅ *Ganador correcto (1pt):*\n${ganadores.map(pr => `• ${nombrePart(pr.participante_id)} (${pr.goles_local}-${pr.goles_visitante})`).join('\n')}` : '',
-        fallaron.length > 0 ? `❌ *Fallaron:*\n${fallaron.map(pr => `• ${nombrePart(pr.participante_id)} (${pr.goles_local}-${pr.goles_visitante})`).join('\n')}` : '',
-      ].filter(Boolean).join('\n')
-      setWaMensaje(lineas)
+      // Ranking del grupo para felicitar al puntero
+      const { data: todos } = await supabase
+        .from('pronosticos').select('participante_id, puntos').in('participante_id', [...idsGrupo])
+      const totales: Record<string, number> = {}
+      for (const pr of (todos ?? []) as { participante_id: string; puntos: number | null }[]) {
+        totales[pr.participante_id] = (totales[pr.participante_id] ?? 0) + (pr.puntos ?? 0)
+      }
+      const lider = Object.entries(totales).sort((a, b) => b[1] - a[1])[0]
+
+      const secciones: string[] = [
+        `⚽ *${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}* ⚽`,
+        `_${grupo?.nombre ?? ''}_`,
+        '',
+      ]
+      if (exactos.length > 0)
+        secciones.push(`🎯 *Resultado exacto* (+3 pts)\n${exactos.map(pr => `• ${nombrePart(pr.participante_id)}`).join('\n')}`, '')
+      if (ganadores.length > 0)
+        secciones.push(`✅ *Acertaron el ganador* (+1 pt)\n${ganadores.map(pr => `• ${nombrePart(pr.participante_id)} _(${pr.goles_local}-${pr.goles_visitante})_`).join('\n')}`, '')
+      if (fallaron.length > 0)
+        secciones.push(`❌ *No acertaron*\n${fallaron.map(pr => `• ${nombrePart(pr.participante_id)} _(${pr.goles_local}-${pr.goles_visitante})_`).join('\n')}`, '')
+      if (lider && lider[1] > 0)
+        secciones.push('━━━━━━━━━━━━', `🏆 *Puntero del grupo:* ${nombrePart(lider[0])} — *${lider[1]} pts*`, '¡Felicidades! 🎉👏')
+
+      const mensaje = secciones.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+      setWaMensaje(mensaje)
+      setWaCopiado(false)
     }
   }
 
@@ -465,9 +489,14 @@ export default function AdminGrupoPage() {
                 <p className="text-green-400 text-xs font-semibold mb-2">Compartir resultado</p>
                 <pre className="text-slate-300 text-xs whitespace-pre-wrap font-sans bg-slate-900 rounded-lg p-3 mb-3 leading-relaxed">{waMensaje}</pre>
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(waMensaje); setWaCopiado(true); setTimeout(() => setWaCopiado(false), 2500) }}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors">
+                    {waCopiado ? '✅ Copiado' : '📋 Copiar'}
+                  </button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(waMensaje)}`} target="_blank" rel="noopener noreferrer"
                     className="flex-1 bg-green-700 hover:bg-green-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors text-center">
-                    💬 Compartir en WhatsApp
+                    💬 WhatsApp
                   </a>
                   <button onClick={() => setWaMensaje(null)}
                     className="px-3 text-slate-500 hover:text-slate-300 text-xs transition-colors">
