@@ -36,16 +36,16 @@ export function partidoYaEmpezó(fecha: string | null): boolean {
   return new Date(fecha) <= new Date()
 }
 
-// Cuánto antes del partido se cierran los pronósticos (1 hora)
-const CIERRE_ANTES_MS = 60 * 60 * 1000
+// Cuánto antes del partido se cierran los pronósticos (5 minutos)
+const CIERRE_ANTES_MS = 5 * 60 * 1000
 
-// Pronósticos cerrados 1h antes del partido
+// Pronósticos cerrados 5 min antes del partido
 export function partidoCerrado(fecha: string | null): boolean {
   if (!fecha) return false
   return Date.now() >= new Date(fecha).getTime() - CIERRE_ANTES_MS
 }
 
-// Fecha/hora exacta en que se cierran los pronósticos (1h antes del partido)
+// Fecha/hora exacta en que se cierran los pronósticos (5 min antes del partido)
 export function fechaCierre(fecha: string | null): string {
   if (!fecha) return ''
   return new Date(new Date(fecha).getTime() - CIERRE_ANTES_MS).toLocaleString('es-PE', {
