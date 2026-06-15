@@ -155,9 +155,10 @@ export default function GrupoPage() {
     setLoading(true)
     setError('')
 
+    const actor = `${nombre.trim()} (${documento.trim()})`
     const { data, error: dbError } = await supabase
       .from('participantes')
-      .insert({ grupo_id: grupo!.id, nombre: nombre.trim(), documento: documento.trim(), prediccion_campeon: campeon || null })
+      .insert({ grupo_id: grupo!.id, nombre: nombre.trim(), documento: documento.trim(), prediccion_campeon: campeon || null, created_by: actor, updated_by: actor })
       .select()
       .single()
 

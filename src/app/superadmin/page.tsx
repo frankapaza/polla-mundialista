@@ -92,7 +92,7 @@ export default function SuperAdminPage() {
   async function guardarPassword(grupoId: string) {
     if (!nuevoPass.trim()) return
     setGuardandoPass(true)
-    await supabase.from('grupos').update({ admin_password: nuevoPass.trim() }).eq('id', grupoId)
+    await supabase.from('grupos').update({ admin_password: nuevoPass.trim(), updated_by: 'superadmin' }).eq('id', grupoId)
     setGuardandoPass(false)
     setEditandoPass(null)
     setNuevoPass('')

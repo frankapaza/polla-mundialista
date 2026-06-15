@@ -139,14 +139,15 @@ export default function PronosticosPage() {
         ? calcularPuntos(gl, gv, partido.goles_local!, partido.goles_visitante!)
         : null
 
+    const actor = `${participante.nombre} (${participante.documento})`
     let error
     if (existing) {
       ({ error } = await supabase.from('pronosticos')
-        .update({ goles_local: gl, goles_visitante: gv, puntos, updated_at: new Date().toISOString() })
+        .update({ goles_local: gl, goles_visitante: gv, puntos, updated_by: actor })
         .eq('id', existing.id))
     } else {
       ({ error } = await supabase.from('pronosticos')
-        .insert({ participante_id: participante.id, partido_id: partido.id, goles_local: gl, goles_visitante: gv, puntos }))
+        .insert({ participante_id: participante.id, partido_id: partido.id, goles_local: gl, goles_visitante: gv, puntos, created_by: actor, updated_by: actor }))
     }
 
     setSaving(false)

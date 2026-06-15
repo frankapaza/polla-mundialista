@@ -42,6 +42,8 @@ export default function CrearForm() {
       costo_inscripcion: costo ? parseFloat(costo) : 0,
       cierre_inscripciones: cierre || null,
       admin_password: adminPass.trim(),
+      created_by: 'creador del grupo',
+      updated_by: 'creador del grupo',
     })
 
     if (dbError) {

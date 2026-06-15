@@ -11,13 +11,14 @@ type Tab = 'pagos' | 'resultados' | 'config' | 'dashboard'
 
 const GRUPOS_TORNEO = ['A','B','C','D','E','F','G','H','I','J','K','L']
 
-function PartidoResultadoCard({ partido, resultados, savingRes, resMsg, setResultado, guardarResultado }: {
+function PartidoResultadoCard({ partido, resultados, savingRes, resMsg, setResultado, guardarResultado, verWhatsApp }: {
   partido: Partido
   resultados: Record<string, { local: string; visitante: string }>
   savingRes: Record<string, boolean>
   resMsg: Record<string, string>
   setResultado: (id: string, side: 'local' | 'visitante', val: string) => void
   guardarResultado: (partido: Partido) => void
+  verWhatsApp: (partido: Partido) => void
 }) {
   const r = resultados[partido.id] ?? { local: '', visitante: '' }
   const yaIngresado = partido.goles_local !== null
@@ -51,12 +52,21 @@ function PartidoResultadoCard({ partido, resultados, savingRes, resMsg, setResul
             ? `Resultado: ${partido.goles_local}-${partido.goles_visitante}`
             : 'Sin resultado')}
         </span>
-        <button
-          onClick={() => guardarResultado(partido)}
-          disabled={savingRes[partido.id]}
-          className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40">
-          {savingRes[partido.id] ? 'Guardando...' : yaIngresado ? 'Actualizar' : 'Guardar'}
-        </button>
+        <div className="flex items-center gap-2">
+          {yaIngresado && (
+            <button
+              onClick={() => verWhatsApp(partido)}
+              className="bg-green-800 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              💬 Ver WhatsApp
+            </button>
+          )}
+          <button
+            onClick={() => guardarResultado(partido)}
+            disabled={savingRes[partido.id]}
+            className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40">
+            {savingRes[partido.id] ? 'Guardando...' : yaIngresado ? 'Actualizar' : 'Guardar'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -174,6 +184,7 @@ export default function AdminGrupoPage() {
       costo_inscripcion: costo ? parseFloat(costo) : 0,
       cierre_inscripciones: cierre ? new Date(cierre).toISOString() : null,
       campeon: campeonConfig || null,
+      updated_by: `admin:${codigo}`,
     }).eq('id', grupo.id)
     setSavingConfig(false)
     if (error) {
@@ -193,7 +204,7 @@ export default function AdminGrupoPage() {
     setToggling(prev => ({ ...prev, [participante.id]: true }))
     const nuevoPago = !participante.pago
     const { error } = await supabase.from('participantes')
-      .update({ pago: nuevoPago }).eq('id', participante.id)
+      .update({ pago: nuevoPago, updated_by: `admin:${codigo}` }).eq('id', participante.id)
     if (!error) {
       setParticipantes(prev =>
         prev.map(p => p.id === participante.id ? { ...p, pago: nuevoPago } : p)
@@ -239,7 +250,7 @@ export default function AdminGrupoPage() {
 
     setSavingRes(prev => ({ ...prev, [partido.id]: true }))
     const { error } = await supabase.from('partidos')
-      .update({ goles_local: gl, goles_visitante: gv }).eq('id', partido.id)
+      .update({ goles_local: gl, goles_visitante: gv, updated_by: `admin:${codigo}` }).eq('id', partido.id)
 
     if (error) {
       setSavingRes(prev => ({ ...prev, [partido.id]: false }))
@@ -249,12 +260,14 @@ export default function AdminGrupoPage() {
 
     const { data: pronos } = await supabase.from('pronosticos').select().eq('partido_id', partido.id)
 
-    // Recalcular puntos de todos (los puntos no dependen del grupo)
+    // Recalcular puntos de todos (los puntos no dependen del grupo).
+    // No tocamos updated_by: así sigue reflejando quién editó el pronóstico,
+    // no el recálculo automático de puntos.
     for (const prono of (pronos ?? []) as Pronostico[]) {
       // Una infracción siempre vale 0, no se recalcula
       const puntos = prono.infraccion ? 0 : calcularPuntos(prono.goles_local, prono.goles_visitante, gl, gv)
       await supabase.from('pronosticos')
-        .update({ puntos, updated_at: new Date().toISOString() }).eq('id', prono.id)
+        .update({ puntos }).eq('id', prono.id)
     }
 
     // Solo los pronósticos de ESTE grupo (los partidos son globales entre grupos)
@@ -265,41 +278,55 @@ export default function AdminGrupoPage() {
     setResMsg(prev => ({ ...prev, [partido.id]: `✅ ${pronosGrupo.length} pronósticos actualizados` }))
     setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p))
 
-    // Generar mensaje WhatsApp lindo (solo nombres del grupo)
-    if (pronosGrupo.length > 0) {
-      const nombrePart = (id: string) => participantes.find(p => p.id === id)?.nombre ?? 'Jugador'
-      const ptsDe = (pr: Pronostico) => calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv)
-      const exactos = pronosGrupo.filter(pr => ptsDe(pr) === 3)
-      const ganadores = pronosGrupo.filter(pr => ptsDe(pr) === 1)
-      const fallaron = pronosGrupo.filter(pr => ptsDe(pr) === 0)
+    const msg = await construirMensajeWhatsApp(partido, gl, gv)
+    if (msg) { setWaMensaje(msg); setWaCopiado(false) }
+  }
 
-      // Ranking del grupo para felicitar al puntero
-      const { data: todos } = await supabase
-        .from('pronosticos').select('participante_id, puntos').in('participante_id', [...idsGrupo])
-      const totales: Record<string, number> = {}
-      for (const pr of (todos ?? []) as { participante_id: string; puntos: number | null }[]) {
-        totales[pr.participante_id] = (totales[pr.participante_id] ?? 0) + (pr.puntos ?? 0)
-      }
-      const lider = Object.entries(totales).sort((a, b) => b[1] - a[1])[0]
+  // Construye el mensaje de WhatsApp de un resultado SIN escribir en la base (solo lectura).
+  async function construirMensajeWhatsApp(partido: Partido, gl: number, gv: number): Promise<string | null> {
+    const { data: pronos } = await supabase.from('pronosticos').select().eq('partido_id', partido.id)
+    const idsGrupo = new Set(participantes.map(p => p.id))
+    const pronosGrupo = ((pronos ?? []) as Pronostico[]).filter(pr => idsGrupo.has(pr.participante_id))
+    if (pronosGrupo.length === 0) return null
 
-      const secciones: string[] = [
-        `⚽ *${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}* ⚽`,
-        `_${grupo?.nombre ?? ''}_`,
-        '',
-      ]
-      if (exactos.length > 0)
-        secciones.push(`🎯 *Resultado exacto* (+3 pts)\n${exactos.map(pr => `• ${nombrePart(pr.participante_id)}`).join('\n')}`, '')
-      if (ganadores.length > 0)
-        secciones.push(`✅ *Acertaron el ganador* (+1 pt)\n${ganadores.map(pr => `• ${nombrePart(pr.participante_id)} _(${pr.goles_local}-${pr.goles_visitante})_`).join('\n')}`, '')
-      if (fallaron.length > 0)
-        secciones.push(`❌ *No acertaron*\n${fallaron.map(pr => `• ${nombrePart(pr.participante_id)} _(${pr.goles_local}-${pr.goles_visitante})_`).join('\n')}`, '')
-      if (lider && lider[1] > 0)
-        secciones.push('━━━━━━━━━━━━', `🏆 *Puntero del grupo:* ${nombrePart(lider[0])} — *${lider[1]} pts*`, '¡Felicidades! 🎉👏')
+    const nombrePart = (id: string) => participantes.find(p => p.id === id)?.nombre ?? 'Jugador'
+    const ptsDe = (pr: Pronostico) => pr.infraccion ? 0 : calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv)
+    const exactos = pronosGrupo.filter(pr => ptsDe(pr) === 3)
+    const ganadores = pronosGrupo.filter(pr => ptsDe(pr) === 1)
+    const fallaron = pronosGrupo.filter(pr => ptsDe(pr) === 0)
 
-      const mensaje = secciones.join('\n').replace(/\n{3,}/g, '\n\n').trim()
-      setWaMensaje(mensaje)
-      setWaCopiado(false)
+    // Ranking del grupo para felicitar al puntero
+    const { data: todos } = await supabase
+      .from('pronosticos').select('participante_id, puntos').in('participante_id', [...idsGrupo])
+    const totales: Record<string, number> = {}
+    for (const pr of (todos ?? []) as { participante_id: string; puntos: number | null }[]) {
+      totales[pr.participante_id] = (totales[pr.participante_id] ?? 0) + (pr.puntos ?? 0)
     }
+    const lider = Object.entries(totales).sort((a, b) => b[1] - a[1])[0]
+
+    const secciones: string[] = [
+      `⚽ *${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}* ⚽`,
+      `_${grupo?.nombre ?? ''}_`,
+      '',
+    ]
+    if (exactos.length > 0)
+      secciones.push(`🎯 *Resultado exacto* (+3 pts)\n${exactos.map(pr => `• ${nombrePart(pr.participante_id)}`).join('\n')}`, '')
+    if (ganadores.length > 0)
+      secciones.push(`✅ *Acertaron el ganador* (+1 pt)\n${ganadores.map(pr => `• ${nombrePart(pr.participante_id)} _(${pr.goles_local}-${pr.goles_visitante})_`).join('\n')}`, '')
+    if (fallaron.length > 0)
+      secciones.push(`❌ *No acertaron*\n${fallaron.map(pr => `• ${nombrePart(pr.participante_id)} _(${pr.goles_local}-${pr.goles_visitante})_`).join('\n')}`, '')
+    if (lider && lider[1] > 0)
+      secciones.push('━━━━━━━━━━━━', `🏆 *Puntero del grupo:* ${nombrePart(lider[0])} — *${lider[1]} pts*`, '¡Felicidades! 🎉👏')
+
+    return secciones.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+  }
+
+  // Ver el WhatsApp de un resultado YA cargado, sin re-guardar ni recalcular nada.
+  async function verWhatsApp(partido: Partido) {
+    if (partido.goles_local === null || partido.goles_visitante === null) return
+    const msg = await construirMensajeWhatsApp(partido, partido.goles_local, partido.goles_visitante)
+    setWaMensaje(msg ?? `⚽ *${partido.equipo_local} ${partido.goles_local} - ${partido.goles_visitante} ${partido.equipo_visitante}*\n_Todavía no hay pronósticos de este grupo._`)
+    setWaCopiado(false)
   }
 
   if (!autenticado) {
@@ -533,7 +560,7 @@ export default function AdminGrupoPage() {
                 </div>
                 <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Grupo {grupoActivo}</h2>
                 <div className="space-y-3">
-                  {partidosPorGrupo[grupoActivo]?.map(partido => <PartidoResultadoCard key={partido.id} partido={partido} resultados={resultados} savingRes={savingRes} resMsg={resMsg} setResultado={setResultado} guardarResultado={guardarResultado} />)}
+                  {partidosPorGrupo[grupoActivo]?.map(partido => <PartidoResultadoCard key={partido.id} partido={partido} resultados={resultados} savingRes={savingRes} resMsg={resMsg} setResultado={setResultado} guardarResultado={guardarResultado} verWhatsApp={verWhatsApp} />)}
                 </div>
               </>
             )}
@@ -559,7 +586,7 @@ export default function AdminGrupoPage() {
                       ))}
                     </div>
                     <div className="space-y-3">
-                      {partidosElim.filter(p => p.fase === faseElim).map(partido => <PartidoResultadoCard key={partido.id} partido={partido} resultados={resultados} savingRes={savingRes} resMsg={resMsg} setResultado={setResultado} guardarResultado={guardarResultado} />)}
+                      {partidosElim.filter(p => p.fase === faseElim).map(partido => <PartidoResultadoCard key={partido.id} partido={partido} resultados={resultados} savingRes={savingRes} resMsg={resMsg} setResultado={setResultado} guardarResultado={guardarResultado} verWhatsApp={verWhatsApp} />)}
                     </div>
                   </>
                 )}
