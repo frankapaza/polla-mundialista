@@ -50,7 +50,19 @@
       "Bash(git push *)",
       "Bash(ping *)",
       "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(f'{len\\(data\\)} pronósticos encontrados'\\)\")",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(node scripts/find-participants.mjs)",
+      "Bash(node scripts/delete-participants.mjs)",
+      "Bash(rm -rf scripts/find-participants.mjs scripts/delete-participants.mjs)",
+      "Bash(rmdir scripts *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(git commit -m '@ *)",
+      "Bash(git commit *)",
+      "Bash(ls vercel.json)",
+      "Bash(grep -i CRON_SECRET .env.local)",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(node *)"
     ]
   }
 }

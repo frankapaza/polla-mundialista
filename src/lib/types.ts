@@ -38,6 +38,7 @@ export interface Pronostico {
   goles_local: number
   goles_visitante: number
   puntos: number | null
+  infraccion: boolean
   created_at: string
   updated_at: string
 }

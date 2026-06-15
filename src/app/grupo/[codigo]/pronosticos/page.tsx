@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown, semaforoColor, fechaCierre } from '@/lib/utils'
+import { formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown, semaforoColor, fechaCierre, calcularPuntos } from '@/lib/utils'
 import { flagUrl } from '@/lib/flags'
 import type { Partido, Pronostico, Grupo, Participante } from '@/lib/types'
 
@@ -129,14 +129,24 @@ export default function PronosticosPage() {
     const gv = parseInt(sc.visitante)
     const existing = pronosticos[partido.id]
 
+    // Si el partido ya tiene resultado cargado, calcular los puntos ahora mismo.
+    // (Si no, quedan en null y el admin los calcula al cargar el resultado.)
+    // Una infracción siempre vale 0 y no se puede revertir editando.
+    const yaJugado = partido.goles_local !== null && partido.goles_visitante !== null
+    const puntos = existing?.infraccion
+      ? 0
+      : yaJugado
+        ? calcularPuntos(gl, gv, partido.goles_local!, partido.goles_visitante!)
+        : null
+
     let error
     if (existing) {
       ({ error } = await supabase.from('pronosticos')
-        .update({ goles_local: gl, goles_visitante: gv, puntos: null, updated_at: new Date().toISOString() })
+        .update({ goles_local: gl, goles_visitante: gv, puntos, updated_at: new Date().toISOString() })
         .eq('id', existing.id))
     } else {
       ({ error } = await supabase.from('pronosticos')
-        .insert({ participante_id: participante.id, partido_id: partido.id, goles_local: gl, goles_visitante: gv }))
+        .insert({ participante_id: participante.id, partido_id: partido.id, goles_local: gl, goles_visitante: gv, puntos }))
     }
 
     setSaving(false)
@@ -336,11 +346,15 @@ export default function PronosticosPage() {
             <span>{formatearFecha(partido.fecha)}</span>
             <div className="flex items-center gap-2">
               {jugado && pron && (
-                <span className={`font-bold px-2 py-0.5 rounded ${
-                  pron.puntos === 3 ? 'bg-emerald-900 text-emerald-300' :
-                  pron.puntos === 1 ? 'bg-blue-900 text-blue-300' :
-                  'bg-red-900/50 text-red-400'
-                }`}>{pron.puntos} pts</span>
+                pron.infraccion ? (
+                  <span className="font-bold px-2 py-0.5 rounded bg-red-700 text-white">🚩 Infracción · 0 pts</span>
+                ) : (
+                  <span className={`font-bold px-2 py-0.5 rounded ${
+                    pron.puntos === 3 ? 'bg-emerald-900 text-emerald-300' :
+                    pron.puntos === 1 ? 'bg-blue-900 text-blue-300' :
+                    'bg-red-900/50 text-red-400'
+                  }`}>{pron.puntos} pts</span>
+                )
               )}
               {empezó && !jugado && <span className="text-amber-400 font-medium animate-pulse">🔴 En juego</span>}
               {cerrado && !empezó && !jugado && (

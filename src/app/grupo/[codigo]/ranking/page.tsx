@@ -11,6 +11,7 @@ type RankingRow = Participante & {
   total: number
   exactos: number
   ganadores: number
+  infracciones: number
   sparkData: number[]
 }
 
@@ -69,6 +70,7 @@ export default function RankingPage() {
       const total = prs.reduce((s: number, pr: Pronostico) => s + (pr.puntos ?? 0), 0)
       const exactos = prs.filter((pr: Pronostico) => pr.puntos === 3).length
       const ganadores = prs.filter((pr: Pronostico) => pr.puntos === 1).length
+      const infracciones = prs.filter((pr: Pronostico) => pr.infraccion).length
 
       let cumulative = 0
       const sparkData = partidosConResult.map((partido: Partido) => {
@@ -77,7 +79,7 @@ export default function RankingPage() {
         return cumulative
       })
 
-      return { ...p, total, exactos, ganadores, sparkData }
+      return { ...p, total, exactos, ganadores, infracciones, sparkData }
     }).sort((a: RankingRow, b: RankingRow) => b.total - a.total)
 
     setGrupo(g as Grupo)
@@ -245,6 +247,12 @@ export default function RankingPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-white font-semibold truncate">{p.nombre}</p>
+                      {p.infracciones > 0 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0 bg-red-700 text-white font-bold"
+                          title="Editó su pronóstico después de iniciado el partido">
+                          🚩 {p.infracciones === 1 ? 'Infracción' : `${p.infracciones} infracciones`}
+                        </span>
+                      )}
                       {tieneCosto && (
                         <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
                           p.pago ? 'bg-emerald-900/60 text-emerald-400' : 'bg-amber-900/60 text-amber-400'

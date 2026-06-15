@@ -146,7 +146,8 @@ export async function GET(req: NextRequest) {
         .eq('partido_id', partido.id)
 
       for (const prono of (pronos ?? []) as Pronostico[]) {
-        const puntos = calcularPuntos(prono.goles_local, prono.goles_visitante, homeScore, awayScore)
+        // Una infracción siempre vale 0, no se recalcula
+        const puntos = prono.infraccion ? 0 : calcularPuntos(prono.goles_local, prono.goles_visitante, homeScore, awayScore)
         await supabase
           .from('pronosticos')
           .update({ puntos, updated_at: new Date().toISOString() })
