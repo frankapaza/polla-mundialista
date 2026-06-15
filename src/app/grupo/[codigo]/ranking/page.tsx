@@ -248,9 +248,10 @@ export default function RankingPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-white font-semibold truncate">{p.nombre}</p>
                       {p.infracciones > 0 && (
-                        <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0 bg-red-700 text-white font-bold"
-                          title="Editó su pronóstico después de iniciado el partido">
-                          🚩 {p.infracciones === 1 ? 'Infracción' : `${p.infracciones} infracciones`}
+                        <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded flex-shrink-0 bg-red-900/40 text-red-300 font-bold border border-red-700/50"
+                          title="Tarjeta roja: editó su pronóstico después de iniciado el partido">
+                          <span className="inline-block w-3 h-4 rounded-[2px] bg-red-600 shadow-sm rotate-6" />
+                          {p.infracciones === 1 ? 'Tarjeta roja' : `${p.infracciones} tarjetas rojas`}
                         </span>
                       )}
                       {tieneCosto && (

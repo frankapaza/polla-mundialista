@@ -347,7 +347,11 @@ export default function PronosticosPage() {
             <div className="flex items-center gap-2">
               {jugado && pron && (
                 pron.infraccion ? (
-                  <span className="font-bold px-2 py-0.5 rounded bg-red-700 text-white">🚩 Infracción · 0 pts</span>
+                  <span className="inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded bg-red-900/50 text-red-300 border border-red-700/50"
+                    title="Tarjeta roja: editaste tu pronóstico después de iniciado el partido">
+                    <span className="inline-block w-3 h-4 rounded-[2px] bg-red-600 shadow-sm rotate-6" />
+                    Tarjeta roja · 0 pts
+                  </span>
                 ) : (
                   <span className={`font-bold px-2 py-0.5 rounded ${
                     pron.puntos === 3 ? 'bg-emerald-900 text-emerald-300' :
