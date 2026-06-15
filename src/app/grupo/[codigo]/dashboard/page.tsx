@@ -38,6 +38,8 @@ export default function DashboardPage() {
   const [participantes, setParticipantes] = useState<ParticipanteConTotal[]>([])
   const [partidos, setPartidos] = useState<Partido[]>([])
   const [pronosIdx, setPronosIdx] = useState<Record<string, Record<string, Pronostico>>>({})
+  // Claves "participanteId:partidoId" de quién YA pronosticó (sin el marcador, para no revelarlo)
+  const [tienePronostico, setTienePronostico] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
   const cargar = useCallback(async () => {
@@ -94,6 +96,18 @@ export default function DashboardPage() {
       idx[pr.participante_id][pr.partido_id] = pr
     }
     setPronosIdx(idx)
+
+    // Existencia de pronósticos (solo las claves, SIN el marcador) para mostrar
+    // quién ya pronosticó en partidos aún no revelados, sin filtrar el resultado.
+    const tiene = new Set<string>()
+    if (ids.length > 0) {
+      const { data: keys } = await supabase.from('pronosticos')
+        .select('participante_id, partido_id').in('participante_id', ids)
+      for (const k of (keys ?? []) as { participante_id: string; partido_id: string }[]) {
+        tiene.add(`${k.participante_id}:${k.partido_id}`)
+      }
+    }
+    setTienePronostico(tiene)
 
     // Ordenar por puntos. Solo los partidos jugados otorgan puntos, y esos siempre
     // están entre los revelados, así que el total es correcto también para no-admins.
@@ -174,8 +188,8 @@ export default function DashboardPage() {
         </p>
         <p className="text-slate-600 text-xs mb-4">
           {esAdmin
-            ? '👑 Como admin ves todos los pronósticos. Los jugadores los ven recién 1h antes de cada partido.'
-            : 'Los pronósticos de los demás aparecen como * y se revelan 1h antes de que inicie cada partido.'}
+            ? '👑 Como admin ves todos los pronósticos. Para los jugadores, el marcador se revela 5 min antes de cada partido.'
+            : 'Antes de cada partido: ✓ = ya pronosticó · "falta" = todavía no (así sabés a quién recordarle). El marcador real se muestra 5 min antes de que empiece.'}
         </p>
 
         {GRUPOS_TORNEO.map(grupoTorneo => {
@@ -243,11 +257,17 @@ export default function DashboardPage() {
                           {/* Pronósticos por participante */}
                           {participantes.map((p: ParticipanteConTotal) => {
                             if (!revelar) {
-                              // Oculto: se muestra * y el dato real ni se descargó al navegador
+                              // Oculto: no se descarga el marcador, solo si YA pronosticó.
+                              const yaPronostico = tienePronostico.has(`${p.id}:${partido.id}`)
                               return (
                                 <td key={p.id} className="px-2 py-2.5 text-center whitespace-nowrap">
-                                  <span className="text-slate-600 font-semibold tracking-widest"
-                                    title="Se revela 1h antes del partido">*</span>
+                                  {yaPronostico ? (
+                                    <span className="text-emerald-500 font-bold"
+                                      title="Ya tiene pronóstico (se revela 5 min antes del partido)">✓</span>
+                                  ) : (
+                                    <span className="text-amber-500/80 text-[10px] font-semibold"
+                                      title="Todavía sin pronóstico">falta</span>
+                                  )}
                                 </td>
                               )
                             }
