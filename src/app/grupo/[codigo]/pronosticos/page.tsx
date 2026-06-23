@@ -124,9 +124,20 @@ export default function PronosticosPage() {
     if (sc?.visitante === '' || sc?.visitante === undefined) return false
     if (!participante) return false
 
-    setSaving(true)
     const gl = parseInt(sc.local)
     const gv = parseInt(sc.visitante)
+
+    // Marcadores inusuales (>5 goles) suelen ser errores de tipeo (p.ej. un
+    // dígito que se concatenó al corregir). Pedir confirmación explícita antes
+    // de persistir, para no guardar en silencio cosas como "14-4".
+    if (gl > 5 || gv > 5) {
+      const ok = window.confirm(
+        `⚠ Marcador inusual\n\n${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}\n\n¿Confirmás que querés guardar este resultado?`
+      )
+      if (!ok) return false
+    }
+
+    setSaving(true)
     const existing = pronosticos[partido.id]
 
     // Si el partido ya tiene resultado cargado, calcular los puntos ahora mismo.
@@ -192,6 +203,9 @@ export default function PronosticosPage() {
     if (!sc || sc.local === '' || sc.visitante === '') return
     const pron = pronosticos[p.id]
     if (pron && sc.local === String(pron.goles_local) && sc.visitante === String(pron.goles_visitante)) return
+    // No auto-guardar marcadores inusuales (>5): que pasen por el botón
+    // Guardar, donde guardarPronostico pide confirmación.
+    if (parseInt(sc.local) > 5 || parseInt(sc.visitante) > 5) return
     const timer = setTimeout(() => guardarRef.current(p), 1200)
     return () => clearTimeout(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -420,6 +434,7 @@ export default function PronosticosPage() {
                 <div className="flex items-center gap-2">
                   <input type="text" inputMode="numeric" value={sc.local}
                     onChange={e => setScore(partido.id, 'local', e.target.value)}
+                    onFocus={e => e.currentTarget.select()}
                     placeholder="–"
                     className={`w-14 h-14 bg-slate-800 border-2 rounded-xl text-center font-bold text-2xl focus:outline-none transition-colors placeholder-slate-600 ${
                       sc.local !== '' ? 'border-emerald-600 text-white' : 'border-slate-700 text-slate-400 focus:border-emerald-500'
@@ -427,6 +442,7 @@ export default function PronosticosPage() {
                   <span className="text-slate-500 font-bold text-xl">-</span>
                   <input type="text" inputMode="numeric" value={sc.visitante}
                     onChange={e => setScore(partido.id, 'visitante', e.target.value)}
+                    onFocus={e => e.currentTarget.select()}
                     placeholder="–"
                     className={`w-14 h-14 bg-slate-800 border-2 rounded-xl text-center font-bold text-2xl focus:outline-none transition-colors placeholder-slate-600 ${
                       sc.visitante !== '' ? 'border-emerald-600 text-white' : 'border-slate-700 text-slate-400 focus:border-emerald-500'
