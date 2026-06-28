@@ -12,6 +12,40 @@ export function calcularPuntos(
   return signoPronostico === signoResultado ? 1 : 0
 }
 
+// Etiquetas de fase para mostrar al usuario.
+const FASE_LABELS: Record<string, string> = {
+  grupos: 'Fase de grupos',
+  '16avos': '16avos de final',
+  octavos: 'Octavos de final',
+  cuartos: 'Cuartos de final',
+  semis: 'Semifinal',
+  tercero: 'Tercer puesto',
+  final: 'Final',
+}
+const FASE_CORTA: Record<string, string> = {
+  '16avos': '16avos',
+  octavos: 'Octavos',
+  cuartos: 'Cuartos',
+  semis: 'Semi',
+  tercero: '3er puesto',
+  final: 'Final',
+}
+
+export function nombreFase(fase: string): string {
+  return FASE_LABELS[fase] ?? fase
+}
+
+// Encabezado de un partido: "Grupo A" en fase de grupos, o el nombre de la fase
+// en eliminatoria (donde grupo_torneo es null).
+export function etiquetaPartido(p: { fase: string; grupo_torneo: string | null }): string {
+  return p.fase === 'grupos' && p.grupo_torneo ? `Grupo ${p.grupo_torneo}` : nombreFase(p.fase)
+}
+
+// Versión corta para listas compactas: "GA" o "Octavos".
+export function etiquetaCorta(p: { fase: string; grupo_torneo: string | null }): string {
+  return p.fase === 'grupos' && p.grupo_torneo ? `G${p.grupo_torneo}` : (FASE_CORTA[p.fase] ?? p.fase)
+}
+
 export function generarCodigo(largo = 6): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   return Array.from({ length: largo }, () =>

@@ -106,7 +106,7 @@ export default function AdminGrupoPage() {
   const [waCopiado, setWaCopiado] = useState(false)
   const [grupoActivo, setGrupoActivo] = useState('A')
   const [faseResultados, setFaseResultados] = useState<'grupos' | 'eliminatoria'>('grupos')
-  const [faseElim, setFaseElim] = useState('octavos')
+  const [faseElim, setFaseElim] = useState('16avos')
 
   const EQUIPOS_MUNDIAL = [
     'Alemania','Arabia Saudita','Argelia','Argentina','Australia','Austria',
@@ -384,6 +384,7 @@ export default function AdminGrupoPage() {
   }, {} as Record<string, Partido[]>)
 
   const FASES_ELIM: { id: string; label: string }[] = [
+    { id: '16avos', label: '16avos' },
     { id: 'octavos', label: 'Octavos' },
     { id: 'cuartos', label: 'Cuartos' },
     { id: 'semis', label: 'Semifinal' },

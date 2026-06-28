@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { flagUrl } from '@/lib/flags'
-import { partidoCerrado } from '@/lib/utils'
+import { partidoCerrado, nombreFase } from '@/lib/utils'
 import type { Grupo, Participante, Partido, Pronostico } from '@/lib/types'
 
 const GRUPOS_TORNEO = ['A','B','C','D','E','F','G','H','I','J','K','L']
@@ -66,10 +66,13 @@ export default function DashboardPage() {
 
     const [{ data: parts }, { data: mats }] = await Promise.all([
       supabase.from('participantes').select().eq('grupo_id', grupoData.id).order('created_at'),
-      supabase.from('partidos').select().eq('fase', 'grupos').order('numero_partido'),
+      supabase.from('partidos').select().order('numero_partido'),
     ])
 
-    const partidosData = (mats ?? []) as Partido[]
+    // Grupos completos + eliminatoria ya programada (con fecha). Las rondas sin
+    // cruces definidos (sin fecha) se omiten hasta cargarse.
+    const partidosData = ((mats ?? []) as Partido[])
+      .filter(p => p.fase === 'grupos' || p.fecha !== null)
     setPartidos(partidosData)
 
     const ids = (parts ?? []).map((p: Participante) => p.id)
@@ -157,10 +160,20 @@ export default function DashboardPage() {
     </main>
   )
 
-  const partidosPorGrupo = GRUPOS_TORNEO.reduce((acc, gt) => {
-    acc[gt] = partidos.filter((p: Partido) => p.grupo_torneo === gt)
-    return acc
-  }, {} as Record<string, Partido[]>)
+  // Secciones del dashboard: un bloque por grupo (A..L) y luego un bloque por
+  // cada ronda de eliminatoria que ya tenga partidos cargados.
+  const FASES_ELIM = ['16avos', 'octavos', 'cuartos', 'semis', 'tercero', 'final']
+  const secciones: { titulo: string; matchs: Partido[] }[] = []
+  for (const gt of GRUPOS_TORNEO) {
+    const matchs = partidos.filter((p: Partido) => p.fase === 'grupos' && p.grupo_torneo === gt)
+    if (matchs.length) secciones.push({ titulo: `Grupo ${gt}`, matchs })
+  }
+  for (const f of FASES_ELIM) {
+    const matchs = partidos
+      .filter((p: Partido) => p.fase === f)
+      .sort((a, b) => a.numero_partido - b.numero_partido)
+    if (matchs.length) secciones.push({ titulo: nombreFase(f), matchs })
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 pb-16">
@@ -192,14 +205,13 @@ export default function DashboardPage() {
             : 'Antes de cada partido: ✓ = ya pronosticó · "falta" = todavía no (así sabés a quién recordarle). El marcador real se muestra 5 min antes de que empiece.'}
         </p>
 
-        {GRUPOS_TORNEO.map(grupoTorneo => {
-          const matchs = partidosPorGrupo[grupoTorneo]
-          if (!matchs?.length) return null
+        {secciones.map(seccion => {
+          const matchs = seccion.matchs
 
           return (
-            <div key={grupoTorneo} className="mb-8">
+            <div key={seccion.titulo} className="mb-8">
               <h2 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
-                Grupo {grupoTorneo}
+                {seccion.titulo}
               </h2>
 
               {/* Tabla scrollable */}

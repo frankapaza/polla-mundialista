@@ -1,8 +1,18 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist } from 'next/font/google'
+import { Barlow, Barlow_Condensed } from 'next/font/google'
 import './globals.css'
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
+const barlow = Barlow({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-barlow',
+})
+
+const barlowCondensed = Barlow_Condensed({
+  subsets: ['latin'],
+  weight: ['500', '600', '700', '800'],
+  variable: '--font-barlow-condensed',
+})
 
 export const metadata: Metadata = {
   title: 'Polla Mundialista 2026',
@@ -12,7 +22,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#059669',
+  themeColor: '#0c1510',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -21,11 +31,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${geist.variable} h-full`}>
+    <html lang="es" className={`${barlow.variable} ${barlowCondensed.variable} h-full`}>
       <head>
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className="min-h-full bg-slate-950 text-white antialiased">
+      <body className="min-h-full bg-pool-bg text-pool-text font-sans antialiased">
         {children}
       </body>
     </html>

@@ -6,6 +6,19 @@ interface Auditoria {
   updated_by?: string | null
 }
 
+// Una "liga" agrupa varios pozos bajo un único código (migration_008).
+export interface Liga extends Auditoria {
+  id: string
+  nombre: string
+  codigo: string
+  admin_password: string | null
+  campeon: string | null
+  created_at: string
+}
+
+export type FaseTorneo = 'grupos' | '16avos' | 'octavos' | 'cuartos' | 'semis' | 'tercero' | 'final'
+
+// `grupos` es ahora un "pozo" dentro de una liga (migration_008).
 export interface Grupo extends Auditoria {
   id: string
   nombre: string
@@ -15,7 +28,13 @@ export interface Grupo extends Auditoria {
   admin_password: string | null
   campeon: string | null
   created_at: string
+  liga_id: string | null
+  modo: 'clasico' | 'survivor'
+  fases: FaseTorneo[]
 }
+
+// Alias semántico: dentro del modelo nuevo, un Grupo se usa como Pozo.
+export type Pozo = Grupo
 
 export interface Participante extends Auditoria {
   id: string
@@ -30,7 +49,7 @@ export interface Participante extends Auditoria {
 export interface Partido extends Auditoria {
   id: string
   numero_partido: number
-  fase: 'grupos' | 'octavos' | 'cuartos' | 'semis' | 'tercero' | 'final'
+  fase: FaseTorneo
   grupo_torneo: string | null
   equipo_local: string
   equipo_visitante: string
@@ -49,6 +68,17 @@ export interface Pronostico extends Auditoria {
   infraccion: boolean
   created_at: string
   updated_at: string
+}
+
+// Pick del pozo Survivor: un equipo por fase (migration_008).
+export interface SurvivorPick extends Auditoria {
+  id: string
+  participante_id: string
+  fase: FaseTorneo
+  equipo: string
+  partido_id: string | null
+  estado: 'pendiente' | 'sobrevive' | 'eliminado'
+  created_at: string
 }
 
 export interface RankingEntry {

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown, semaforoColor, fechaCierre, calcularPuntos } from '@/lib/utils'
+import { formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown, semaforoColor, fechaCierre, calcularPuntos, etiquetaPartido, etiquetaCorta } from '@/lib/utils'
 import { flagUrl } from '@/lib/flags'
 import type { Partido, Pronostico, Grupo, Participante } from '@/lib/types'
 
@@ -58,7 +58,7 @@ export default function PronosticosPage() {
     const [{ data: grupoData }, { data: partData }, { data: particicData }, { data: pronosData }] =
       await Promise.all([
         supabase.from('grupos').select().eq('codigo', codigo).single(),
-        supabase.from('partidos').select().eq('fase', 'grupos').order('fecha').order('numero_partido'),
+        supabase.from('partidos').select().order('fecha').order('numero_partido'),
         supabase.from('participantes').select().eq('id', participanteId).single(),
         supabase.from('pronosticos').select().eq('participante_id', participanteId),
       ])
@@ -75,11 +75,16 @@ export default function PronosticosPage() {
     setGrupo(grupoData as Grupo)
     setParticipante(particicData as Participante)
 
-    const sorted = ((partData ?? []) as Partido[]).sort((a, b) => {
-      if (!a.fecha) return 1
-      if (!b.fecha) return -1
-      return new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
-    })
+    // Mostramos la fase de grupos completa y, de eliminatoria, solo los partidos
+    // ya programados (con fecha). Las rondas aún por definir (octavos en adelante,
+    // sin fecha) se ocultan hasta que se carguen sus cruces y horarios.
+    const sorted = ((partData ?? []) as Partido[])
+      .filter(p => p.fase === 'grupos' || p.fecha !== null)
+      .sort((a, b) => {
+        if (!a.fecha) return 1
+        if (!b.fecha) return -1
+        return new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+      })
     setPartidos(sorted)
 
     const pronosMap: Record<string, Pronostico> = {}
@@ -276,7 +281,7 @@ export default function PronosticosPage() {
       <div className="max-w-lg mx-auto w-full px-4 pt-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
-            Grupo {partido.grupo_torneo}
+            {etiquetaPartido(partido)}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -318,7 +323,7 @@ export default function PronosticosPage() {
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-slate-300 truncate">
                         {p.equipo_local} vs {p.equipo_visitante}
-                        <span className="text-slate-600 ml-1">· G{p.grupo_torneo}</span>
+                        <span className="text-slate-600 ml-1">· {etiquetaCorta(p)}</span>
                       </div>
                       <div className="text-xs text-slate-600">{formatearFecha(p.fecha)}</div>
                     </div>

@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+/* ── Sistema de diseño "Polla Mundialista" (verde oscuro + dorado) ── */
+@theme {
+  /* Colores */
+  --color-pool-bg: #0c1510;
+  --color-pool-header: #0e1813;
+  --color-pool-surface: #14201a;
+  --color-pool-surface-2: #14241a;
+  --color-pool-green: #19d45c;
+  --color-pool-green-dark: #0fa847;
+  --color-pool-gold: #f5c542;
+  --color-pool-text: #eaf2ec;
+  --color-pool-muted: #8fa597;
+  --color-pool-muted-2: #7fae90;
+  --color-pool-line: #1f3328;
+  --color-pool-danger: #ef5b5b;
+
+  /* Tipografía (las variables --font-* las inyecta next/font en <html>) */
+  --font-sans: var(--font-barlow), system-ui, sans-serif;
+  --font-condensed: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
+
+  /* Animaciones */
+  --animate-pulse-dot: pulseDot 1.4s infinite;
+  --animate-float-y: floatY 4s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .3; transform: scale(.65); }
+}
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
 * {
   box-sizing: border-box;
 }
