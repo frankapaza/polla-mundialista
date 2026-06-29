@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Flag } from '@/components/common/Flag'
 import {
   formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown,
-  fechaCierre, calcularPuntos, etiquetaPartido,
+  fechaCierre, etiquetaPartido,
 } from '@/lib/utils'
 import {
   fetchLiga, fetchPozos, getLigaSession, getActivePozoId, setActivePozoId,
@@ -105,18 +105,12 @@ export default function PrediccionesPage() {
       if (!ok) return false
     }
     setSaving(true)
-    const existing = pronosticos[partido.id]
-    const yaJugado = partido.goles_local !== null && partido.goles_visitante !== null
-    const puntos = existing?.infraccion ? 0 : yaJugado ? calcularPuntos(gl, gv, partido.goles_local!, partido.goles_visitante!) : null
-    const actor = `${participante.nombre} (${participante.documento})`
-    let error
-    if (existing) {
-      ({ error } = await supabase.from('pronosticos').update({ goles_local: gl, goles_visitante: gv, puntos, updated_by: actor }).eq('id', existing.id))
-    } else {
-      ({ error } = await supabase.from('pronosticos').insert({ participante_id: participante.id, partido_id: partido.id, goles_local: gl, goles_visitante: gv, puntos, created_by: actor, updated_by: actor }))
-    }
+    const r = await fetch('/api/pronostico', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participanteId: participante.id, partidoId: partido.id, golesLocal: gl, golesVisitante: gv }),
+    })
     setSaving(false)
-    if (!error) {
+    if (r.ok) {
       setSavedIds(prev => new Set(prev).add(partido.id))
       setPronosticos(prev => ({ ...prev, [partido.id]: { ...prev[partido.id], goles_local: gl, goles_visitante: gv } as Pronostico }))
       return true

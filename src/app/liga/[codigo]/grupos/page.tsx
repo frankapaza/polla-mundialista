@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import {
-  fetchLiga, fetchPozos, fetchMisParticipaciones, unirseAPozo,
+  fetchLiga, fetchPozos, fetchMisParticipaciones,
   getLigaSession, clearLigaSession, setActivePozoId, getActivePozoId,
 } from '@/lib/liga'
 import { nombreFase } from '@/lib/utils'
@@ -50,8 +50,12 @@ export default function GruposPage() {
     const sess = getLigaSession(codigo)
     if (!sess) return
     setJoining(pozo.id)
-    const p = await unirseAPozo(pozo, sess.documento, sess.nombre)
-    if (p) setMias(prev => ({ ...prev, [pozo.id]: p }))
+    const r = await fetch('/api/pozo/unirse', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pozoId: pozo.id }),
+    })
+    const data = await r.json().catch(() => ({}))
+    if (r.ok && data.participante) setMias(prev => ({ ...prev, [pozo.id]: data.participante }))
     setJoining(null)
   }
 

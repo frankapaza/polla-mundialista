@@ -13,7 +13,7 @@ import { nombreFase, partidoCerrado, formatearCountdown } from '@/lib/utils'
 import { fetchLiga, fetchPozos, getLigaSession } from '@/lib/liga'
 import {
   fasesDelPozo, equiposDeFase, faseProgramada, faseCerrada, estadoPick, standings,
-  fetchSurvivorPicks, guardarPick, type Standing,
+  fetchSurvivorPicks, type Standing,
 } from '@/lib/survivor'
 import type { Liga, Pozo, Partido, Participante, SurvivorPick, FaseTorneo } from '@/lib/types'
 
@@ -149,8 +149,11 @@ export default function SurvivorPage() {
                     <button key={equipo} disabled={cerrado || saving === equipo}
                       onClick={async () => {
                         setSaving(equipo)
-                        const pk = await guardarPick(yo, activeFase!, equipo, partido.id)
-                        if (pk) setPicks(prev => [...prev.filter(p => !(p.participante_id === yo.id && p.fase === activeFase)), pk])
+                        const r = await fetch('/api/survivor/pick', {
+                          method: 'POST', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ participanteId: yo.id, fase: activeFase, equipo, partidoId: partido.id }),
+                        })
+                        if (r.ok) setPicks(await fetchSurvivorPicks(participantes.map(p => p.id)))
                         setSaving('')
                       }}
                       className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-colors disabled:opacity-40 ${elegido ? 'border-pool-green bg-pool-green/12' : 'border-white/10 bg-pool-surface hover:border-pool-green/40'}`}>

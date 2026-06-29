@@ -7,10 +7,10 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Flag } from '@/components/common/Flag'
-import { calcularPuntos, formatearFecha, nombreFase } from '@/lib/utils'
+import { formatearFecha, nombreFase } from '@/lib/utils'
 import { fetchLiga, fetchPozos } from '@/lib/liga'
-import { standings, resolverSurvivor, fetchSurvivorPicks } from '@/lib/survivor'
-import type { Liga, Pozo, Partido, Participante, Pronostico, SurvivorPick } from '@/lib/types'
+import { standings, fetchSurvivorPicks } from '@/lib/survivor'
+import type { Liga, Pozo, Partido, Participante, SurvivorPick } from '@/lib/types'
 
 interface Score { local: string; visitante: string }
 
@@ -70,31 +70,29 @@ export default function LigaAdminPage() {
 
   async function togglePago(p: Participante) {
     const nuevo = !p.pago
-    await supabase.from('participantes').update({ pago: nuevo, updated_by: `admin:${codigo}` }).eq('id', p.id)
-    setPartsByPozo(prev => ({ ...prev, [p.grupo_id]: prev[p.grupo_id].map(x => x.id === p.id ? { ...x, pago: nuevo } : x) }))
+    const r = await fetch('/api/admin/pago', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participanteId: p.id, pago: nuevo }) })
+    if (r.ok) setPartsByPozo(prev => ({ ...prev, [p.grupo_id]: prev[p.grupo_id].map(x => x.id === p.id ? { ...x, pago: nuevo } : x) }))
   }
 
   async function guardarResultado(partido: Partido) {
-    const r = res[partido.id]
-    if (r?.local === '' || r?.local === undefined || r?.visitante === '' || r?.visitante === undefined) return
-    const gl = parseInt(r.local), gv = parseInt(r.visitante)
-    await supabase.from('partidos').update({ goles_local: gl, goles_visitante: gv, updated_by: `admin:${codigo}` }).eq('id', partido.id)
-    // Recalcular puntos de todos los pronósticos de ese partido (global).
-    const { data: pronos } = await supabase.from('pronosticos').select().eq('partido_id', partido.id)
-    for (const pr of (pronos ?? []) as Pronostico[]) {
-      const puntos = pr.infraccion ? 0 : calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv)
-      await supabase.from('pronosticos').update({ puntos }).eq('id', pr.id)
-    }
-    setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p))
-    setMsg(`✅ Resultado guardado (${(pronos ?? []).length} pronósticos recalculados)`)
+    const sc = res[partido.id]
+    if (sc?.local === '' || sc?.local === undefined || sc?.visitante === '' || sc?.visitante === undefined) return
+    const gl = parseInt(sc.local), gv = parseInt(sc.visitante)
+    const resp = await fetch('/api/admin/resultado', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partidoId: partido.id, golesLocal: gl, golesVisitante: gv }) })
+    const data = await resp.json().catch(() => ({}))
+    if (resp.ok) {
+      setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p))
+      setMsg(`✅ Resultado guardado (${data.recalculados ?? 0} pronósticos recalculados)`)
+    } else setMsg('Error al guardar (¿sesión de admin vencida?)')
     setTimeout(() => setMsg(''), 3500)
   }
 
   async function resolverSurvivorPozo(pozo: Pozo) {
     const ids = (partsByPozo[pozo.id] ?? []).map(p => p.id)
-    const n = await resolverSurvivor(ids, partidos)
-    setPicks(await fetchSurvivorPicks(ids))
-    setMsg(`✅ Survivor resuelto: ${n} picks actualizados`)
+    const resp = await fetch('/api/admin/survivor-resolver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pozoId: pozo.id }) })
+    const data = await resp.json().catch(() => ({}))
+    if (resp.ok) { setPicks(await fetchSurvivorPicks(ids)); setMsg(`✅ Survivor resuelto: ${data.actualizados ?? 0} picks`) }
+    else setMsg('Error al resolver')
     setTimeout(() => setMsg(''), 3500)
   }
 
