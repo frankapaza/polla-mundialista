@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/common/AppShell'
+import { Cargando } from '@/components/common/Cargando'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -140,7 +141,7 @@ export default function PrediccionesPage() {
     if (matchIndex < partidos.length - 1) setMatchIndex(i => i + 1)
   }
 
-  if (loading) return <main className="min-h-screen flex items-center justify-center text-pool-muted">Cargando…</main>
+  if (loading) return <Cargando />
 
   const totalPuntos = Object.values(pronosticos).reduce((s, p) => s + (p.puntos ?? 0), 0)
   const hechos = Object.keys(pronosticos).length

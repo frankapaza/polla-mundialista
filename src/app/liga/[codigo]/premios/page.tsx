@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/common/AppShell'
+import { Cargando } from '@/components/common/Cargando'
 import { Card } from '@/components/ui/Card'
 import { fetchLiga, fetchPozos, getActivePozoId, getLigaSession } from '@/lib/liga'
 import type { Liga, Pozo, Participante } from '@/lib/types'
@@ -42,7 +43,7 @@ export default function PremiosPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  if (loading) return <main className="min-h-screen flex items-center justify-center text-pool-muted">Cargando…</main>
+  if (loading) return <Cargando />
 
   const costo = pozo?.costo_inscripcion ?? 0
   const pagaron = participantes.filter(p => p.pago).length

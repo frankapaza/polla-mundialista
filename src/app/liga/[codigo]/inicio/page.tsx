@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/common/AppShell'
+import { Cargando } from '@/components/common/Cargando'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -68,7 +69,7 @@ export default function InicioPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  if (loading) return <main className="min-h-screen flex items-center justify-center text-pool-muted">Cargando…</main>
+  if (loading) return <Cargando />
 
   const total = Object.values(pronos).reduce((s, p) => s + (p.puntos ?? 0), 0)
   const exactos = Object.values(pronos).filter(p => p.puntos === 3).length

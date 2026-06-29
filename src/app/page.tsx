@@ -62,6 +62,30 @@ export default function Home() {
             className="w-full bg-pool-bg border border-white/10 rounded-lg px-4 py-2.5 text-center font-mono tracking-widest uppercase placeholder-pool-muted/40 focus:outline-none focus:ring-2 focus:ring-pool-green" />
           <Button type="submit" size="lg" className="w-full">Entrar</Button>
         </form>
+
+        <div className="my-4 flex items-center gap-3 text-pool-muted text-xs uppercase">
+          <div className="flex-1 h-px bg-white/10" /> o <div className="flex-1 h-px bg-white/10" />
+        </div>
+        <Link href="/crear"><Button variant="outline" size="lg" className="w-full">🐓 Crear tu propia polla</Button></Link>
+
+        {/* Cómo funciona */}
+        <div className="mt-10">
+          <h3 className="font-condensed font-extrabold text-lg uppercase text-center mb-4">Cómo funciona</h3>
+          <div className="flex flex-col gap-2">
+            {([
+              ['Creá o sumate', 'Armá tu polla o entrá con el código que te pasaron.'],
+              ['Poné tu PIN', 'Entrás con tu DNI + un PIN de 6 dígitos. Nadie juega por vos.'],
+              ['Pronosticá', 'Cargá los marcadores antes de que empiece cada partido.'],
+              ['Sumá puntos', 'Resultado exacto +3 · acertar el ganador +1. ¡El que más suma, gana!'],
+            ] as [string, string][]).map(([t, d], i) => (
+              <Card key={i} className="p-3 flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-pool-green/15 text-pool-green flex items-center justify-center font-condensed font-extrabold flex-none">{i + 1}</span>
+                <div><div className="font-semibold text-sm">{t}</div><div className="text-pool-muted text-xs">{d}</div></div>
+              </Card>
+            ))}
+          </div>
+          <p className="text-center text-pool-muted text-xs mt-4">🐓 Te acompaña <b className="text-pool-gold">Gollo</b>, la mascota oficial de la Polla Mundialista.</p>
+        </div>
       </div>
     </main>
   )

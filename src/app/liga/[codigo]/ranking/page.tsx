@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AppShell } from '@/components/common/AppShell'
+import { Cargando } from '@/components/common/Cargando'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import {
@@ -39,7 +40,7 @@ export default function RankingPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  if (loading) return <main className="min-h-screen flex items-center justify-center text-pool-muted">Cargando…</main>
+  if (loading) return <Cargando />
 
   const podio = rows.slice(0, 3)
   const PODIO_STYLE = [

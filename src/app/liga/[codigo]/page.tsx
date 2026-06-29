@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { PinPad } from '@/components/common/PinPad'
+import { Cargando } from '@/components/common/Cargando'
 import { fetchLiga, getLigaSession, setLigaSession } from '@/lib/liga'
 import type { Liga } from '@/lib/types'
 
@@ -101,7 +102,7 @@ export default function LigaLoginPage() {
       <p className="text-pool-muted mt-2">El código <span className="font-mono text-pool-text">{codigo}</span> no existe.</p>
     </main>
   )
-  if (!liga) return <main className="min-h-screen flex items-center justify-center text-pool-muted">Cargando…</main>
+  if (!liga) return <Cargando />
 
   const tituloPin =
     paso === 'pin' ? 'Ingresá tu PIN'
