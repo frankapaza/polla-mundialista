@@ -51,5 +51,5 @@ const FLAGS: Record<string, string> = {
 
 export function flagUrl(equipo: string): string {
   const code = FLAGS[equipo]
-  return code ? `https://flagcdn.com/w20/${code}.png` : ''
+  return code ? `https://flagcdn.com/w160/${code}.png` : ''
 }
