@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Flag } from '@/components/common/Flag'
-import { formatearFecha, nombreFase, partidoCerrado } from '@/lib/utils'
+import { formatearFecha, nombreFase, partidoCerrado, calcularPuntos } from '@/lib/utils'
 import { fetchLiga, fetchPozos } from '@/lib/liga'
 import { standings, fetchSurvivorPicks } from '@/lib/survivor'
 import type { Liga, Pozo, Partido, Participante, SurvivorPick, Pronostico } from '@/lib/types'
@@ -36,6 +36,8 @@ export default function LigaAdminPage() {
   const [cfgCierre, setCfgCierre] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
+  const [waMsg, setWaMsg] = useState('')
+  const [waCopiado, setWaCopiado] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -109,9 +111,34 @@ export default function LigaAdminPage() {
     const gl = parseInt(sc.local), gv = parseInt(sc.visitante)
     const resp = await fetch('/api/admin/resultado', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partidoId: partido.id, golesLocal: gl, golesVisitante: gv }) })
     const data = await resp.json().catch(() => ({}))
-    if (resp.ok) { setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p)); flash(`✅ Resultado guardado (${data.recalculados ?? 0} pronósticos recalculados)`) }
-    else flash('Error al guardar (¿sesión de admin vencida?)')
+    if (resp.ok) {
+      setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p))
+      setWaMsg(construirWsp(partido, gl, gv, partsByPozo[sel] ?? []))
+      flash(`✅ Resultado guardado (${data.recalculados ?? 0} pronósticos recalculados)`)
+    } else flash('Error al guardar (¿sesión de admin vencida?)')
   }
+
+  // Arma el mensaje de WhatsApp del resultado (quién acertó), sin escribir nada.
+  function construirWsp(partido: Partido, gl: number, gv: number, insc: Participante[]): string {
+    const ex: string[] = [], gan: string[] = [], fall: string[] = []
+    for (const p of insc) {
+      const pr = pronoMap[`${p.id}:${partido.id}`]
+      if (!pr) continue
+      const pts = pr.infraccion ? 0 : calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv)
+      const n = p.nombre.split(' ')[0]
+      if (pts === 3) ex.push(`${n} (${pr.goles_local}-${pr.goles_visitante})`)
+      else if (pts === 1) gan.push(n)
+      else fall.push(n)
+    }
+    const L = [`⚽ *${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}* ⚽`]
+    if (ex.length) L.push(`\n🎯 *Exactos (+3):* ${ex.join(', ')}`)
+    if (gan.length) L.push(`✅ *Acertaron ganador (+1):* ${gan.join(', ')}`)
+    if (fall.length) L.push(`✗ Fallaron: ${fall.join(', ')}`)
+    if (!ex.length && !gan.length && !fall.length) L.push('\n_Nadie pronosticó este partido._')
+    return L.join('\n')
+  }
+
+  function copiarWsp() { navigator.clipboard.writeText(waMsg); setWaCopiado(true); setTimeout(() => setWaCopiado(false), 2000) }
 
   async function resolverSurvivorPozo(pozo: Pozo) {
     const ids = (partsByPozo[pozo.id] ?? []).map(p => p.id)
@@ -180,6 +207,22 @@ export default function LigaAdminPage() {
         {loading && <p className="text-pool-muted">Cargando…</p>}
         {msg && <div className="mb-4 rounded-lg bg-pool-green/10 border border-pool-green/30 text-pool-green text-sm px-4 py-2.5">{msg}</div>}
 
+        {waMsg && (
+          <Card accent className="p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-condensed font-bold uppercase text-sm">Mensaje de WhatsApp</span>
+              <button onClick={() => setWaMsg('')} className="text-pool-muted hover:text-pool-text">✕</button>
+            </div>
+            <pre className="whitespace-pre-wrap text-sm bg-pool-bg rounded-lg p-3 mb-3 font-sans leading-relaxed">{waMsg}</pre>
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" className="flex-1" onClick={copiarWsp}>{waCopiado ? '✅ Copiado' : '📋 Copiar'}</Button>
+              <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                <Button size="sm" className="w-full">💬 Enviar por WhatsApp</Button>
+              </a>
+            </div>
+          </Card>
+        )}
+
         {pozo && (
           <>
             <Card className="p-4 mb-4 flex items-center justify-around text-center flex-wrap gap-3">
@@ -232,6 +275,9 @@ export default function LigaAdminPage() {
                         className="w-12 h-10 bg-pool-bg border border-white/15 rounded-lg text-center font-bold" />
                       <span className="flex-1 text-sm font-semibold truncate text-right">{p.equipo_visitante}</span>
                       <Flag equipo={p.equipo_visitante} className="w-6 h-auto" />
+                      {p.goles_local !== null && (
+                        <Button size="sm" variant="ghost" onClick={() => setWaMsg(construirWsp(p, p.goles_local!, p.goles_visitante!, inscritos))}>WSP</Button>
+                      )}
                       <Button size="sm" onClick={() => guardarResultado(p)}>Guardar</Button>
                     </div>
                   </Card>
