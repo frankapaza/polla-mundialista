@@ -113,9 +113,8 @@ export default function LigaLoginPage() {
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <span className="inline-flex w-14 h-14 rounded-2xl bg-pool-gold text-[#231a05] items-center justify-center mb-3">
-            <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/gollo-tablet.png" alt="Gollo" className="w-32 h-auto mx-auto mb-2 drop-shadow-2xl" />
           <h1 className="font-condensed font-extrabold text-3xl uppercase tracking-wide">{liga.nombre}</h1>
           <p className="text-pool-muted text-sm mt-1">Polla Mundialista 2026</p>
         </div>

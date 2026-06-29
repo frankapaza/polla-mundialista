@@ -51,6 +51,12 @@ export default function RankingPage() {
 
   return (
     <AppShell codigo={codigo} active="ranking" ligaNombre={liga?.nombre}>
+      {rows.length > 0 && (
+        <div className="flex justify-center mb-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/gollo-trofeo.png" alt="Gollo" className="w-28 h-auto drop-shadow-2xl" />
+        </div>
+      )}
       <div className="mb-5">
         <h2 className="font-condensed font-extrabold text-2xl uppercase tracking-wide">Tabla de posiciones</h2>
         <p className="text-pool-muted text-sm">{pozo?.nombre}</p>
