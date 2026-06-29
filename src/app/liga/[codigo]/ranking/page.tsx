@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { AppShell } from '@/components/common/AppShell'
 import { Cargando } from '@/components/common/Cargando'
 import { Card } from '@/components/ui/Card'
@@ -57,9 +58,12 @@ export default function RankingPage() {
           <img src="/gollo-trofeo.png" alt="Gollo" className="w-28 h-auto drop-shadow-2xl" />
         </div>
       )}
-      <div className="mb-5">
-        <h2 className="font-condensed font-extrabold text-2xl uppercase tracking-wide">Tabla de posiciones</h2>
-        <p className="text-pool-muted text-sm">{pozo?.nombre}</p>
+      <div className="mb-5 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="font-condensed font-extrabold text-2xl uppercase tracking-wide">Tabla de posiciones</h2>
+          <p className="text-pool-muted text-sm">{pozo?.nombre}</p>
+        </div>
+        <Link href={`/liga/${codigo}/tabla`} className="text-pool-green text-sm font-condensed font-bold uppercase whitespace-nowrap">Pronósticos de todos →</Link>
       </div>
 
       {/* Podio */}

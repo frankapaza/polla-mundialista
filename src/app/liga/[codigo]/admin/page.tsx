@@ -133,16 +133,31 @@ export default function LigaAdminPage() {
       const pr = pronoMap[`${p.id}:${partido.id}`]
       if (!pr) continue
       const pts = pr.infraccion ? 0 : calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv)
-      const n = p.nombre.split(' ')[0]
-      if (pts === 3) ex.push(`${n} (${pr.goles_local}-${pr.goles_visitante})`)
-      else if (pts === 1) gan.push(n)
-      else fall.push(n)
+      const linea = `* ${p.nombre} (${pr.goles_local}-${pr.goles_visitante})`
+      if (pts === 3) ex.push(linea)
+      else if (pts === 1) gan.push(linea)
+      else fall.push(linea)
     }
-    const L = [`⚽ *${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante}* ⚽`]
-    if (ex.length) L.push(`\n🎯 *Exactos (+3):* ${ex.join(', ')}`)
-    if (gan.length) L.push(`✅ *Acertaron ganador (+1):* ${gan.join(', ')}`)
-    if (fall.length) L.push(`✗ Fallaron: ${fall.join(', ')}`)
-    if (!ex.length && !gan.length && !fall.length) L.push('\n_Nadie pronosticó este partido._')
+    const L = [`⚽ ${partido.equipo_local} ${gl} - ${gv} ${partido.equipo_visitante} ⚽`, liga?.nombre ?? '']
+    if (ex.length) L.push('', '🎯 Exactos (+3 pts)', ...ex)
+    if (gan.length) L.push('', '✅ Acertaron el ganador (+1 pt)', ...gan)
+    if (fall.length) L.push('', '❌ No acertaron', ...fall)
+    if (!ex.length && !gan.length && !fall.length) L.push('', '_Nadie pronosticó este partido._')
+
+    // Puntero del pozo (incluyendo este partido)
+    const totalDe = (p: Participante) => {
+      let t = 0
+      for (const [k, pr] of Object.entries(pronoMap)) {
+        if (!k.startsWith(`${p.id}:`)) continue
+        const pid = k.slice(p.id.length + 1)
+        t += pid === partido.id ? (pr.infraccion ? 0 : calcularPuntos(pr.goles_local, pr.goles_visitante, gl, gv)) : (pr.puntos ?? 0)
+      }
+      return t
+    }
+    const orden = insc.map(p => ({ p, t: totalDe(p) })).sort((a, b) => b.t - a.t)
+    if (orden.length && orden[0].t > 0) {
+      L.push('', '━━━━━━━━━━━━', `🏆 Puntero del grupo: ${orden[0].p.nombre} — ${orden[0].t} pts`, '¡Felicidades! 🎉👏')
+    }
     return L.join('\n')
   }
 

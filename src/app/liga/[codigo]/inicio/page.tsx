@@ -29,6 +29,7 @@ export default function InicioPage() {
   const [pronos, setPronos] = useState<Record<string, Pronostico>>({})
   const [ranking, setRanking] = useState<RankingRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [copiadoInvite, setCopiadoInvite] = useState(false)
   const [, setTick] = useState(0)
 
   useEffect(() => { const i = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(i) }, [])
@@ -77,6 +78,8 @@ export default function InicioPage() {
   const proximo = partidos.find(p => !partidoYaEmpezó(p.fecha))
   const porJugar = partidos.filter(p => !partidoCerrado(p.fecha) && !pronos[p.id]).slice(0, 5)
   const top = ranking.slice(0, 5)
+  const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/liga/${codigo}` : ''
+  function copiarInvite() { navigator.clipboard.writeText(inviteUrl); setCopiadoInvite(true); setTimeout(() => setCopiadoInvite(false), 2000) }
 
   const right = (
     <>
@@ -118,6 +121,18 @@ export default function InicioPage() {
         <Tile label="Cargados" value={`${Object.keys(pronos).length}`} sub={`/${partidos.length}`} />
       </div>
 
+      {/* Invitar amigos */}
+      <Card accent className="p-4 mb-6 flex items-center gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="font-condensed font-bold uppercase text-sm">🐓 Invitá a tus amigos</div>
+          <div className="text-pool-muted text-xs truncate font-mono">{inviteUrl}</div>
+        </div>
+        <Button size="sm" variant="ghost" onClick={copiarInvite}>{copiadoInvite ? '✅ Copiado' : '📋 Copiar'}</Button>
+        <a href={`https://wa.me/?text=${encodeURIComponent(`⚽ Sumate a ${liga?.nombre ?? 'la polla'} — Polla Mundialista 2026 🐓\n${inviteUrl}\nEntrá con tu DNI y creá tu PIN.`)}`} target="_blank" rel="noopener noreferrer">
+          <Button size="sm">💬 WhatsApp</Button>
+        </a>
+      </Card>
+
       <div className="grid md:grid-cols-2 gap-5">
         {/* Por jugar */}
         <div>
@@ -142,7 +157,10 @@ export default function InicioPage() {
 
         {/* Top del pozo */}
         <div>
-          <h3 className="font-condensed font-extrabold text-lg uppercase mb-3">Top del pozo</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-condensed font-extrabold text-lg uppercase">Top del pozo</h3>
+            <Link href={`/liga/${codigo}/tabla`} className="text-pool-green text-xs font-condensed font-bold uppercase">Ver todos →</Link>
+          </div>
           <Card className="p-2 flex flex-col">
             {top.map((r, i) => {
               const yo = r.participante.id === participante?.id
