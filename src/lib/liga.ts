@@ -36,6 +36,40 @@ export function setActivePozoId(codigo: string, pozoId: string) {
   localStorage.setItem(ACTIVE_POZO_KEY(codigo), pozoId)
 }
 
+/**
+ * Verifica la sesión por la COOKIE (fuente de verdad). Devuelve la sesión si la
+ * cookie es válida (y sincroniza el localStorage), o null si no hay (limpiando
+ * la sesión local). Si la red falla, cae al localStorage para no bloquear.
+ */
+export async function verificarSesion(codigo: string): Promise<LigaSession | null> {
+  try {
+    const r = await fetch('/api/auth/me')
+    if (r.status === 401) { clearLigaSession(codigo); return null }
+    if (r.ok) {
+      const me = await r.json()
+      if (me?.ok && me.codigo === codigo) {
+        const s: LigaSession = { documento: me.documento, nombre: me.nombre }
+        setLigaSession(codigo, s)
+        return s
+      }
+      clearLigaSession(codigo)
+      return null
+    }
+  } catch { /* red caída: usar lo local */ }
+  return getLigaSession(codigo)
+}
+
+/** Pozo clásico activo. Por defecto: 16avos (la ronda actual). Conserva la
+ *  elección del jugador si eligió un pozo no-grupos. */
+export function elegirPozoActivo(pozos: Pozo[], codigo: string): Pozo | null {
+  const elegido = pozos.find(p => p.id === getActivePozoId(codigo) && p.modo === 'clasico' && !p.fases.includes('grupos'))
+  if (elegido) return elegido
+  const def = pozos.find(p => p.modo === 'clasico' && p.fases.includes('16avos'))
+    ?? pozos.find(p => p.modo === 'clasico') ?? null
+  if (def) setActivePozoId(codigo, def.id)
+  return def
+}
+
 // ── Datos ──
 export async function fetchLiga(codigo: string): Promise<Liga | null> {
   const { data } = await supabase.from('ligas').select().eq('codigo', codigo).maybeSingle()

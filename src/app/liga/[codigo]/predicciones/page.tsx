@@ -14,7 +14,7 @@ import {
   fechaCierre, etiquetaPartido,
 } from '@/lib/utils'
 import {
-  fetchLiga, fetchPozos, getLigaSession, getActivePozoId, setActivePozoId, clearLigaSession,
+  fetchLiga, fetchPozos, getLigaSession, verificarSesion, elegirPozoActivo, clearLigaSession,
 } from '@/lib/liga'
 import type { Liga, Pozo, Partido, Pronostico, Participante } from '@/lib/types'
 
@@ -43,16 +43,14 @@ export default function PrediccionesPage() {
   }, [])
 
   const cargar = useCallback(async () => {
-    const sess = getLigaSession(codigo)
+    const sess = await verificarSesion(codigo)
     if (!sess) { router.replace(`/liga/${codigo}`); return }
     const l = await fetchLiga(codigo)
     if (!l) { router.replace(`/liga/${codigo}`); return }
     setLiga(l)
 
     const pozos = await fetchPozos(l.id)
-    let pozoId = getActivePozoId(codigo)
-    let activo = pozos.find(p => p.id === pozoId && p.modo === 'clasico')
-    if (!activo) { activo = pozos.find(p => p.modo === 'clasico'); if (activo) { pozoId = activo.id; setActivePozoId(codigo, activo.id) } }
+    const activo = elegirPozoActivo(pozos, codigo)
     if (!activo) { router.replace(`/liga/${codigo}/grupos`); return }
     setPozo(activo)
 

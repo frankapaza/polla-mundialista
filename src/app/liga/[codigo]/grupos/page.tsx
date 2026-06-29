@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import {
-  fetchLiga, fetchPozos, fetchMisParticipaciones,
+  fetchLiga, fetchPozos, fetchMisParticipaciones, verificarSesion,
   getLigaSession, clearLigaSession, setActivePozoId, getActivePozoId,
 } from '@/lib/liga'
 import { nombreFase } from '@/lib/utils'
@@ -27,7 +27,7 @@ export default function GruposPage() {
   const [joining, setJoining] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    const sess = getLigaSession(codigo)
+    const sess = await verificarSesion(codigo)
     if (!sess) { router.replace(`/liga/${codigo}`); return }
     const l = await fetchLiga(codigo)
     if (!l) { router.replace(`/liga/${codigo}`); return }

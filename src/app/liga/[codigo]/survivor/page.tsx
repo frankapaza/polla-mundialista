@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Flag } from '@/components/common/Flag'
 import { nombreFase, partidoCerrado, formatearCountdown } from '@/lib/utils'
-import { fetchLiga, fetchPozos, getLigaSession, clearLigaSession } from '@/lib/liga'
+import { fetchLiga, fetchPozos, verificarSesion, clearLigaSession } from '@/lib/liga'
 import {
   fasesDelPozo, equiposDeFase, faseProgramada, faseCerrada, estadoPick, standings,
   fetchSurvivorPicks, type Standing,
@@ -37,7 +37,7 @@ export default function SurvivorPage() {
 
   const cargar = useCallback(async () => {
     try {
-      const sess = getLigaSession(codigo)
+      const sess = await verificarSesion(codigo)
       if (!sess) { router.replace(`/liga/${codigo}`); return }
       const l = await fetchLiga(codigo); if (!l) { router.replace(`/liga/${codigo}`); return }
       setLiga(l)

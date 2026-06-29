@@ -15,9 +15,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { calcularPuntos } from '@/lib/utils'
 import type { Partido, Pronostico } from '@/lib/types'
+
+export const runtime = 'nodejs'
 
 const API_KEY = process.env.FOOTBALL_DATA_API_KEY
 const WC_CODE = 'WC' // FIFA World Cup en football-data.org
@@ -104,7 +106,7 @@ export async function GET(req: NextRequest) {
     const matches = data.matches ?? []
 
     // Partidos de la app aún sin resultado cargado
-    const { data: partidosPend } = await supabase
+    const { data: partidosPend } = await supabaseAdmin
       .from('partidos')
       .select()
       .filter('goles_local', 'is', null)
@@ -134,13 +136,13 @@ export async function GET(req: NextRequest) {
       )
       if (!partido) continue // ya cargado o no existe en la app
 
-      await supabase
+      await supabaseAdmin
         .from('partidos')
         .update({ goles_local: homeScore, goles_visitante: awayScore })
         .eq('id', partido.id)
 
       // Recalcular pronósticos de ese partido
-      const { data: pronos } = await supabase
+      const { data: pronos } = await supabaseAdmin
         .from('pronosticos')
         .select()
         .eq('partido_id', partido.id)
@@ -148,7 +150,7 @@ export async function GET(req: NextRequest) {
       for (const prono of (pronos ?? []) as Pronostico[]) {
         // Una infracción siempre vale 0, no se recalcula
         const puntos = prono.infraccion ? 0 : calcularPuntos(prono.goles_local, prono.goles_visitante, homeScore, awayScore)
-        await supabase
+        await supabaseAdmin
           .from('pronosticos')
           .update({ puntos, updated_at: new Date().toISOString() })
           .eq('id', prono.id)

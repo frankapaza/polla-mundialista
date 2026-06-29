@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Flag } from '@/components/common/Flag'
 import { partidoCerrado, partidoYaEmpezó, formatearFecha } from '@/lib/utils'
 import {
-  fetchLiga, fetchPozos, fetchRankingPozo, getLigaSession, getActivePozoId, setActivePozoId,
+  fetchLiga, fetchPozos, fetchRankingPozo, verificarSesion, elegirPozoActivo,
   type RankingRow,
 } from '@/lib/liga'
 import type { Liga, Pozo, Partido, Pronostico, Participante } from '@/lib/types'
@@ -35,15 +35,15 @@ export default function InicioPage() {
 
   const cargar = useCallback(async () => {
    try {
-    const sess = getLigaSession(codigo)
+    const sess = await verificarSesion(codigo)
     if (!sess) { router.replace(`/liga/${codigo}`); return }
     const l = await fetchLiga(codigo)
     if (!l) { router.replace(`/liga/${codigo}`); return }
     setLiga(l)
     const pozos = await fetchPozos(l.id)
-    const activo = pozos.find(p => p.id === getActivePozoId(codigo) && p.modo === 'clasico') ?? pozos.find(p => p.modo === 'clasico')
+    const activo = elegirPozoActivo(pozos, codigo)
     if (!activo) { router.replace(`/liga/${codigo}/grupos`); return }
-    setActivePozoId(codigo, activo.id); setPozo(activo)
+    setPozo(activo)
 
     const { data: part } = await supabase.from('participantes').select()
       .eq('grupo_id', activo.id).eq('documento', sess.documento).maybeSingle()

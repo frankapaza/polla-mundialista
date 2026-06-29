@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/common/AppShell'
 import { Cargando } from '@/components/common/Cargando'
 import { Card } from '@/components/ui/Card'
-import { fetchLiga, fetchPozos, getActivePozoId, getLigaSession } from '@/lib/liga'
+import { fetchLiga, fetchPozos, getActivePozoId, verificarSesion } from '@/lib/liga'
 import type { Liga, Pozo, Participante } from '@/lib/types'
 
 const REPARTO = [
@@ -27,7 +27,7 @@ export default function PremiosPage() {
 
   const cargar = useCallback(async () => {
     try {
-      if (!getLigaSession(codigo)) { router.replace(`/liga/${codigo}`); return }
+      if (!(await verificarSesion(codigo))) { router.replace(`/liga/${codigo}`); return }
       const l = await fetchLiga(codigo); if (!l) { router.replace(`/liga/${codigo}`); return }
       setLiga(l)
       const pozos = await fetchPozos(l.id)

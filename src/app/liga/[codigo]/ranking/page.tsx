@@ -7,7 +7,7 @@ import { Cargando } from '@/components/common/Cargando'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import {
-  fetchLiga, fetchPozos, fetchRankingPozo, getLigaSession, getActivePozoId,
+  fetchLiga, fetchPozos, fetchRankingPozo, verificarSesion, elegirPozoActivo,
   type RankingRow,
 } from '@/lib/liga'
 import type { Liga, Pozo } from '@/lib/types'
@@ -24,14 +24,14 @@ export default function RankingPage() {
   const [loading, setLoading] = useState(true)
 
   const cargar = useCallback(async () => {
-    const sess = getLigaSession(codigo)
+    const sess = await verificarSesion(codigo)
     if (!sess) { router.replace(`/liga/${codigo}`); return }
     setMiDoc(sess.documento)
     const l = await fetchLiga(codigo)
     if (!l) { router.replace(`/liga/${codigo}`); return }
     setLiga(l)
     const pozos = await fetchPozos(l.id)
-    const activo = pozos.find(p => p.id === getActivePozoId(codigo) && p.modo === 'clasico') ?? pozos.find(p => p.modo === 'clasico')
+    const activo = elegirPozoActivo(pozos, codigo)
     if (!activo) { router.replace(`/liga/${codigo}/grupos`); return }
     setPozo(activo)
     setRows(await fetchRankingPozo(activo.id))

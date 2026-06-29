@@ -93,15 +93,23 @@ export default function LigaAdminPage() {
 
   function flash(t: string) { setMsg(t); setTimeout(() => setMsg(''), 3500) }
 
+  // Si la sesión de admin venció (401), salir a re-loguear.
+  function sesionVencida(status: number) {
+    if (status === 401) { sessionStorage.removeItem('polla_admin'); setAuth(false); return true }
+    return false
+  }
+
   async function togglePago(p: Participante) {
     const nuevo = !p.pago
     const r = await fetch('/api/admin/pago', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participanteId: p.id, pago: nuevo }) })
+    if (sesionVencida(r.status)) return
     if (r.ok) setPartsByPozo(prev => ({ ...prev, [p.grupo_id]: prev[p.grupo_id].map(x => x.id === p.id ? { ...x, pago: nuevo } : x) }))
   }
 
   async function resetPin(p: Participante) {
     if (!window.confirm(`¿Resetear el PIN de ${p.nombre}? Va a tener que crear uno nuevo en su próximo ingreso.`)) return
     const r = await fetch('/api/admin/reset-pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ documento: p.documento }) })
+    if (sesionVencida(r.status)) return
     flash(r.ok ? `✅ PIN de ${p.nombre} reseteado` : 'Error al resetear PIN')
   }
 
@@ -115,7 +123,7 @@ export default function LigaAdminPage() {
       setPartidos(prev => prev.map(p => p.id === partido.id ? { ...p, goles_local: gl, goles_visitante: gv } : p))
       setWaMsg(construirWsp(partido, gl, gv, partsByPozo[sel] ?? []))
       flash(`✅ Resultado guardado (${data.recalculados ?? 0} pronósticos recalculados)`)
-    } else flash('Error al guardar (¿sesión de admin vencida?)')
+    } else if (!sesionVencida(resp.status)) flash('Error al guardar')
   }
 
   // Arma el mensaje de WhatsApp del resultado (quién acertó), sin escribir nada.
@@ -145,7 +153,7 @@ export default function LigaAdminPage() {
     const resp = await fetch('/api/admin/survivor-resolver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pozoId: pozo.id }) })
     const data = await resp.json().catch(() => ({}))
     if (resp.ok) { setPicks(await fetchSurvivorPicks(ids)); flash(`✅ Survivor resuelto: ${data.actualizados ?? 0} picks`) }
-    else flash('Error al resolver')
+    else if (!sesionVencida(resp.status)) flash('Error al resolver')
   }
 
   async function guardarConfig() {
@@ -153,7 +161,7 @@ export default function LigaAdminPage() {
     if (resp.ok) {
       setPozos(prev => prev.map(p => p.id === sel ? { ...p, costo_inscripcion: cfgCosto ? parseFloat(cfgCosto) : 0, cierre_inscripciones: cfgCierre ? new Date(cfgCierre).toISOString() : null } : p))
       flash('✅ Configuración guardada')
-    } else flash('Error al guardar config')
+    } else if (!sesionVencida(resp.status)) flash('Error al guardar config')
   }
 
   function setScore(id: string, side: 'local' | 'visitante', v: string) {
