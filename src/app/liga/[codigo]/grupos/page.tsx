@@ -55,6 +55,7 @@ export default function GruposPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pozoId: pozo.id }),
     })
+    if (r.status === 401) { clearLigaSession(codigo); router.replace(`/liga/${codigo}`); return }
     const data = await r.json().catch(() => ({}))
     if (r.ok && data.participante) setMias(prev => ({ ...prev, [pozo.id]: data.participante }))
     setJoining(null)

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { PinPad } from '@/components/common/PinPad'
 import { Cargando } from '@/components/common/Cargando'
-import { fetchLiga, getLigaSession, setLigaSession } from '@/lib/liga'
+import { fetchLiga, setLigaSession, clearLigaSession } from '@/lib/liga'
 import type { Liga } from '@/lib/types'
 
 type Paso = 'dni' | 'pin' | 'crear' | 'nuevo'
@@ -34,8 +34,18 @@ export default function LigaLoginPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (getLigaSession(codigo)) { router.replace(`/liga/${codigo}/inicio`); return }
-    fetchLiga(codigo).then(l => l ? setLiga(l) : setNotFound(true))
+    (async () => {
+      // Fuente de verdad: la cookie de sesión (no el localStorage).
+      const me = await fetch('/api/auth/me').then(r => r.ok ? r.json() : null).catch(() => null)
+      if (me?.ok && me.codigo === codigo) {
+        setLigaSession(codigo, { documento: me.documento, nombre: me.nombre })
+        router.replace(`/liga/${codigo}/inicio`)
+        return
+      }
+      clearLigaSession(codigo) // sesión local vieja sin cookie → al login
+      const l = await fetchLiga(codigo)
+      if (l) setLiga(l); else setNotFound(true)
+    })()
   }, [codigo, router])
 
   function finish(nom: string) {

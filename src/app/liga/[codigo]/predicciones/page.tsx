@@ -14,7 +14,7 @@ import {
   fechaCierre, etiquetaPartido,
 } from '@/lib/utils'
 import {
-  fetchLiga, fetchPozos, getLigaSession, getActivePozoId, setActivePozoId,
+  fetchLiga, fetchPozos, getLigaSession, getActivePozoId, setActivePozoId, clearLigaSession,
 } from '@/lib/liga'
 import type { Liga, Pozo, Partido, Pronostico, Participante } from '@/lib/types'
 
@@ -111,6 +111,7 @@ export default function PrediccionesPage() {
       body: JSON.stringify({ participanteId: participante.id, partidoId: partido.id, golesLocal: gl, golesVisitante: gv }),
     })
     setSaving(false)
+    if (r.status === 401) { clearLigaSession(codigo); router.replace(`/liga/${codigo}`); return false }
     if (r.ok) {
       setSavedIds(prev => new Set(prev).add(partido.id))
       setPronosticos(prev => ({ ...prev, [partido.id]: { ...prev[partido.id], goles_local: gl, goles_visitante: gv } as Pronostico }))

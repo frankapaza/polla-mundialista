@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Flag } from '@/components/common/Flag'
 import { nombreFase, partidoCerrado, formatearCountdown } from '@/lib/utils'
-import { fetchLiga, fetchPozos, getLigaSession } from '@/lib/liga'
+import { fetchLiga, fetchPozos, getLigaSession, clearLigaSession } from '@/lib/liga'
 import {
   fasesDelPozo, equiposDeFase, faseProgramada, faseCerrada, estadoPick, standings,
   fetchSurvivorPicks, type Standing,
@@ -154,6 +154,7 @@ export default function SurvivorPage() {
                           method: 'POST', headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ participanteId: yo.id, fase: activeFase, equipo, partidoId: partido.id }),
                         })
+                        if (r.status === 401) { clearLigaSession(codigo); router.replace(`/liga/${codigo}`); return }
                         if (r.ok) setPicks(await fetchSurvivorPicks(participantes.map(p => p.id)))
                         setSaving('')
                       }}
