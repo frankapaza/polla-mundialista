@@ -229,7 +229,18 @@ export default function PrediccionesPage() {
             <TeamSide equipo={cur.equipo_local} />
             <div className="flex flex-col items-center gap-3">
               {jugado ? (
-                <Marcador a={cur.goles_local} b={cur.goles_visitante} />
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-condensed font-bold uppercase tracking-widest text-pool-muted-2">Resultado</span>
+                  <Marcador a={cur.goles_local} b={cur.goles_visitante} />
+                  {pron && (
+                    <span className="text-xs text-pool-muted mt-1">
+                      Tu pronóstico: <span className="font-condensed font-bold text-pool-text">{pron.goles_local}-{pron.goles_visitante}</span>
+                      {typeof pron.puntos === 'number' && (
+                        <span className={`font-condensed font-bold ${pron.puntos === 3 ? 'text-pool-green' : pron.puntos === 1 ? 'text-blue-300' : 'text-red-400'}`}> · {pron.puntos === 0 ? '0 pts' : `+${pron.puntos} pt${pron.puntos === 1 ? '' : 's'}`}</span>
+                      )}
+                    </span>
+                  )}
+                </div>
               ) : editable ? (
                 <div className="flex items-center gap-3">
                   <Stepper value={sc.local} onStep={d => step(cur.id, 'local', d)} onType={v => setScore(cur.id, 'local', v)} />
