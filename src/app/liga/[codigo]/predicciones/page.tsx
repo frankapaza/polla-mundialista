@@ -32,6 +32,7 @@ export default function PrediccionesPage() {
   const [partidos, setPartidos] = useState<Partido[]>([])
   const [pronosticos, setPronosticos] = useState<Record<string, Pronostico>>({})
   const [predModelo, setPredModelo] = useState<Record<string, PrediccionModelo>>({})
+  const [revealedPred, setRevealedPred] = useState<Set<string>>(new Set())
   const [scores, setScores] = useState<Record<string, ScoreInput>>({})
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [matchIndex, setMatchIndex] = useState(0)
@@ -177,6 +178,14 @@ export default function PrediccionesPage() {
     const countdown = formatearCountdown(cur.fecha)
     const guardado = savedIds.has(cur.id) || (!!pron && sc.local === String(pron.goles_local) && sc.visitante === String(pron.goles_visitante))
     const editable = !cerrado && !empezó && !jugado
+    // El marcador probable del modelo es un extra para quienes pagaron la inscripción.
+    const puedeVerProbable = !!participante?.pago && !!predModelo[cur.id]
+    const probableVisible = revealedPred.has(cur.id)
+    const toggleProbable = () => setRevealedPred(prev => {
+      const s = new Set(prev)
+      s.has(cur.id) ? s.delete(cur.id) : s.add(cur.id)
+      return s
+    })
 
     return (
       <>
@@ -191,17 +200,29 @@ export default function PrediccionesPage() {
         <Card accent={editable} className="p-6 flex flex-col gap-5">
           <div className="flex items-center justify-between text-xs text-pool-muted">
             <span>{formatearFecha(cur.fecha)}</span>
-            {jugado && pron ? (
-              <span className={`font-condensed font-bold px-2 py-0.5 rounded ${pron.puntos === 3 ? 'bg-pool-green/20 text-pool-green' : pron.puntos === 1 ? 'bg-blue-900 text-blue-300' : 'bg-red-900/50 text-red-400'}`}>{pron.puntos} pts</span>
-            ) : empezó && !jugado ? (
-              <span className="text-pool-gold font-medium animate-pulse">🔴 En juego</span>
-            ) : cerrado ? (
-              <span className="text-pool-muted">🔒 Cerrado</span>
-            ) : countdown ? (
-              <Badge tone="green"><span className="w-1.5 h-1.5 rounded-full bg-pool-green animate-pulse-dot" />Cierra en {countdown}</Badge>
-            ) : (
-              <span className="text-pool-muted text-[11px]">🔒 Cierra: {fechaCierre(cur.fecha)}</span>
-            )}
+            <div className="flex items-center gap-2">
+              {jugado && pron ? (
+                <span className={`font-condensed font-bold px-2 py-0.5 rounded ${pron.puntos === 3 ? 'bg-pool-green/20 text-pool-green' : pron.puntos === 1 ? 'bg-blue-900 text-blue-300' : 'bg-red-900/50 text-red-400'}`}>{pron.puntos} pts</span>
+              ) : empezó && !jugado ? (
+                <span className="text-pool-gold font-medium animate-pulse">🔴 En juego</span>
+              ) : cerrado ? (
+                <span className="text-pool-muted">🔒 Cerrado</span>
+              ) : countdown ? (
+                <Badge tone="green"><span className="w-1.5 h-1.5 rounded-full bg-pool-green animate-pulse-dot" />Cierra en {countdown}</Badge>
+              ) : (
+                <span className="text-pool-muted text-[11px]">🔒 Cierra: {fechaCierre(cur.fecha)}</span>
+              )}
+              {puedeVerProbable && (
+                <button
+                  onClick={toggleProbable}
+                  aria-pressed={probableVisible}
+                  title="Marcador probable del modelo"
+                  className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center font-condensed font-extrabold text-sm border transition-colors ${probableVisible ? 'bg-pool-gold text-pool-bg border-pool-gold' : 'bg-pool-gold/12 text-pool-gold border-pool-gold/40 hover:bg-pool-gold/20'}`}
+                >
+                  P
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -234,7 +255,7 @@ export default function PrediccionesPage() {
           )}
         </Card>
 
-        {predModelo[cur.id] && (
+        {puedeVerProbable && probableVisible && (
           <PrediccionModeloPanel
             pred={predModelo[cur.id]}
             local={cur.equipo_local}
