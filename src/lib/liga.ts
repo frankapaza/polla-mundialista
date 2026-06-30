@@ -110,7 +110,8 @@ export async function fetchMisParticipaciones(
 export interface RankingRow {
   participante: Participante
   total: number
-  exactos: number
+  exactos: number   // aciertos exactos (+3)
+  ganador: number   // acertó el ganador/empate pero no el marcador (+1)
   jugados: number
 }
 
@@ -123,14 +124,18 @@ export async function fetchRankingPozo(pozoId: string): Promise<RankingRow[]> {
     const { data } = await supabase.from('pronosticos').select().in('participante_id', ids)
     pronos = (data ?? []) as Pronostico[]
   }
-  const acc: Record<string, { total: number; exactos: number; jugados: number }> = {}
+  const acc: Record<string, { total: number; exactos: number; ganador: number; jugados: number }> = {}
   for (const p of pronos) {
-    const e = acc[p.participante_id] ?? { total: 0, exactos: 0, jugados: 0 }
-    if (p.puntos != null) { e.total += p.puntos; e.jugados++; if (p.puntos === 3) e.exactos++ }
+    const e = acc[p.participante_id] ?? { total: 0, exactos: 0, ganador: 0, jugados: 0 }
+    if (p.puntos != null) {
+      e.total += p.puntos; e.jugados++
+      if (p.puntos === 3) e.exactos++
+      else if (p.puntos === 1) e.ganador++
+    }
     acc[p.participante_id] = e
   }
   return participantes
-    .map(pt => ({ participante: pt, ...(acc[pt.id] ?? { total: 0, exactos: 0, jugados: 0 }) }))
+    .map(pt => ({ participante: pt, ...(acc[pt.id] ?? { total: 0, exactos: 0, ganador: 0, jugados: 0 }) }))
     .sort((a, b) => b.total - a.total)
 }
 

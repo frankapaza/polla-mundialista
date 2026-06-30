@@ -89,19 +89,20 @@ export default function RankingPage() {
 
       {/* Tabla */}
       <Card className="overflow-hidden p-0">
-        <div className="grid grid-cols-[40px_1fr_60px_70px] px-4 py-3 border-b border-white/[0.07] font-condensed font-bold text-[11px] uppercase tracking-widest text-pool-muted">
-          <span>#</span><span>Jugador</span><span className="text-center">Exactos</span><span className="text-right">Puntos</span>
+        <div className="grid grid-cols-[36px_1fr_56px_60px_64px] px-4 py-3 border-b border-white/[0.07] font-condensed font-bold text-[11px] uppercase tracking-widest text-pool-muted">
+          <span>#</span><span>Jugador</span><span className="text-center">Exactos</span><span className="text-center">Ganador</span><span className="text-right">Puntos</span>
         </div>
         {rows.map((r, i) => {
           const yo = r.participante.documento === miDoc
           return (
-            <div key={r.participante.id} className={`grid grid-cols-[40px_1fr_60px_70px] items-center px-4 py-3 border-b border-white/[0.04] ${yo ? 'bg-pool-green/10' : ''}`}>
+            <div key={r.participante.id} className={`grid grid-cols-[36px_1fr_56px_60px_64px] items-center px-4 py-3 border-b border-white/[0.04] ${yo ? 'bg-pool-green/10' : ''}`}>
               <span className="font-condensed font-extrabold text-pool-muted">{i + 1}</span>
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="w-7 h-7 rounded-full bg-pool-line flex items-center justify-center font-condensed font-bold text-[11px] text-pool-muted-2 flex-none">{r.participante.nombre.slice(0, 2).toUpperCase()}</span>
                 <span className={`text-sm truncate ${yo ? 'font-semibold' : ''}`}>{r.participante.nombre}{yo && <Badge tone="green" className="ml-2 !px-2 !py-0">Tú</Badge>}</span>
               </div>
               <span className="text-center font-condensed font-bold text-pool-muted-2">{r.exactos}</span>
+              <span className="text-center font-condensed font-bold text-pool-muted-2">{r.ganador}</span>
               <span className="text-right font-condensed font-extrabold text-pool-gold">{r.total}</span>
             </div>
           )
