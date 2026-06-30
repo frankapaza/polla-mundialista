@@ -1,0 +1,26 @@
+{
+  "skill_name": "prediccion-mundial",
+  "evals": [
+    {
+      "id": 0,
+      "name": "brasil-croacia-directo",
+      "prompt": "¿Cómo va a quedar Brasil contra Croacia en el Mundial?",
+      "expected_output": "Marcador probable con bloque legible + JSON insertable; usa fuerza Klement + Poisson + ajustes (H2H, forma). Brasil favorito pero Croacia competitiva.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "mexico-eeuu-anfitriones",
+      "prompt": "Predice el marcador de México vs Estados Unidos, los dos son anfitriones",
+      "expected_output": "Maneja host=true para AMBOS equipos; derbi parejo; marcador + probabilidades + confianza; cita fuentes.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "argentina-arabia-favorito",
+      "prompt": "dame un marcador sugerido para Argentina-Arabia Saudita, hay mucha diferencia de ranking",
+      "expected_output": "Favorito claro (Argentina) sin marcador exagerado; menciona el factor suerte/sorpresa; confianza acorde a la brecha.",
+      "files": []
+    }
+  ]
+}

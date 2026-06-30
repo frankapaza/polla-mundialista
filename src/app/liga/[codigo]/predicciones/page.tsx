@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Flag } from '@/components/common/Flag'
+import { PrediccionModeloPanel } from '@/components/common/PrediccionModeloPanel'
 import {
   formatearFecha, partidoYaEmpezó, partidoCerrado, formatearCountdown,
   fechaCierre, etiquetaPartido,
@@ -16,7 +17,7 @@ import {
 import {
   fetchLiga, fetchPozos, getLigaSession, verificarSesion, elegirPozoActivo, clearLigaSession,
 } from '@/lib/liga'
-import type { Liga, Pozo, Partido, Pronostico, Participante } from '@/lib/types'
+import type { Liga, Pozo, Partido, Pronostico, Participante, PrediccionModelo } from '@/lib/types'
 
 interface ScoreInput { local: string; visitante: string }
 
@@ -30,6 +31,7 @@ export default function PrediccionesPage() {
   const [participante, setParticipante] = useState<Participante | null>(null)
   const [partidos, setPartidos] = useState<Partido[]>([])
   const [pronosticos, setPronosticos] = useState<Record<string, Pronostico>>({})
+  const [predModelo, setPredModelo] = useState<Record<string, PrediccionModelo>>({})
   const [scores, setScores] = useState<Record<string, ScoreInput>>({})
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [matchIndex, setMatchIndex] = useState(0)
@@ -65,6 +67,15 @@ export default function PrediccionesPage() {
       .in('fase', activo.fases).not('fecha', 'is', null).order('fecha').order('numero_partido')
     const sorted = (partData ?? []) as Partido[]
     setPartidos(sorted)
+
+    // Marcador probable del modelo para estos partidos (migration_011).
+    const ids = sorted.map(p => p.id)
+    if (ids.length) {
+      const { data: predData } = await supabase.from('predicciones_modelo').select().in('partido_id', ids)
+      const prmap: Record<string, PrediccionModelo> = {}
+      for (const pr of (predData ?? []) as PrediccionModelo[]) prmap[pr.partido_id] = pr
+      setPredModelo(prmap)
+    }
 
     const { data: pronosData } = await supabase.from('pronosticos').select()
       .eq('participante_id', (part as Participante).id)
@@ -222,6 +233,20 @@ export default function PrediccionesPage() {
             </Button>
           )}
         </Card>
+
+        {predModelo[cur.id] && (
+          <PrediccionModeloPanel
+            pred={predModelo[cur.id]}
+            local={cur.equipo_local}
+            visitante={cur.equipo_visitante}
+            editable={editable}
+            onUsar={() => {
+              const p = predModelo[cur.id]
+              setScore(cur.id, 'local', String(p.goles_local))
+              setScore(cur.id, 'visitante', String(p.goles_visitante))
+            }}
+          />
+        )}
 
         <div className="flex gap-3 mt-4">
           <Button variant="ghost" className="flex-1" disabled={matchIndex === 0} onClick={() => setMatchIndex(i => Math.max(0, i - 1))}>← Anterior</Button>

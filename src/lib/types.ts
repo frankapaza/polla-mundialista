@@ -70,6 +70,24 @@ export interface Pronostico extends Auditoria {
   updated_at: string
 }
 
+// Marcador probable calculado por el modelo (skill prediccion-mundial, migration_011).
+export interface PrediccionModelo {
+  id: string
+  partido_id: string
+  goles_local: number
+  goles_visitante: number
+  prob_local: number
+  prob_empate: number
+  prob_visitante: number
+  fuerza_local: number | null
+  fuerza_visitante: number | null
+  confianza: 'alta' | 'media' | 'baja'
+  datos_completos: boolean
+  justificacion: string | null
+  fuentes: string[] | null
+  generado_at: string
+}
+
 // Pick del pozo Survivor: un equipo por fase (migration_008).
 export interface SurvivorPick extends Auditoria {
   id: string
