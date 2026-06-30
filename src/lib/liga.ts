@@ -1,5 +1,15 @@
 import { supabase } from './supabase'
-import type { Liga, Pozo, Participante, Pronostico } from './types'
+import type { Liga, Pozo, Participante, Pronostico, FaseTorneo } from './types'
+
+// Orden de presentación de los pozos: por fase del torneo y Survivor al final.
+const FASE_ORDEN: Record<FaseTorneo, number> = {
+  grupos: 0, '16avos': 1, octavos: 2, cuartos: 3, semis: 4, tercero: 5, final: 6,
+}
+function ordenPozo(p: Pozo): number {
+  if (p.modo === 'survivor') return 100
+  const idxs = p.fases.map(f => FASE_ORDEN[f] ?? 50)
+  return idxs.length ? Math.min(...idxs) : 50
+}
 
 // ── Sesión del jugador dentro de una liga (localStorage) ──
 // La identidad persiste por (liga, documento); el pago es por pozo.
@@ -78,7 +88,8 @@ export async function fetchLiga(codigo: string): Promise<Liga | null> {
 
 export async function fetchPozos(ligaId: string): Promise<Pozo[]> {
   const { data } = await supabase.from('grupos').select().eq('liga_id', ligaId).order('created_at')
-  return (data ?? []) as Pozo[]
+  // Orden del torneo: grupos → 16avos → octavos → … → Survivor (created_at desempata).
+  return ((data ?? []) as Pozo[]).sort((a, b) => ordenPozo(a) - ordenPozo(b))
 }
 
 /** Participantes de este jugador (por documento) en todos los pozos de la liga. */
