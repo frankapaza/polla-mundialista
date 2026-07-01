@@ -28,6 +28,8 @@ export default function SuperAdminPage() {
   const [nuevoPass, setNuevoPass] = useState('')
   const [mostrarPasses, setMostrarPasses] = useState<Set<string>>(new Set())
   const [guardandoPass, setGuardandoPass] = useState(false)
+  const [editandoNombre, setEditandoNombre] = useState<string | null>(null)
+  const [nuevoNombre, setNuevoNombre] = useState('')
 
   const cargarGrupos = useCallback(async () => {
     setLoading(true)
@@ -96,6 +98,13 @@ export default function SuperAdminPage() {
     setGuardandoPass(false)
     setEditandoPass(null)
     setNuevoPass('')
+    cargarGrupos()
+  }
+
+  async function guardarNombre(grupoId: string) {
+    await supabase.from('grupos').update({ admin_nombre: nuevoNombre.trim() || null, updated_by: 'superadmin' }).eq('id', grupoId)
+    setEditandoNombre(null)
+    setNuevoNombre('')
     cargarGrupos()
   }
 
@@ -286,6 +295,42 @@ export default function SuperAdminPage() {
                         )}
                         <button
                           onClick={() => { setEditandoPass(g.id); setNuevoPass(g.admin_password ?? '') }}
+                          className="text-xs text-slate-500 hover:text-emerald-400 underline transition-colors ml-1">
+                          Cambiar
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Nombre del admin (quién administra este grupo) */}
+                  <div className="flex items-center gap-2 flex-wrap mt-2">
+                    <span className="text-slate-500 text-xs">Admin:</span>
+                    {editandoNombre === g.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={nuevoNombre}
+                          onChange={e => setNuevoNombre(e.target.value)}
+                          placeholder="Nombre del admin"
+                          className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-xs w-40 focus:outline-none focus:border-emerald-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => guardarNombre(g.id)}
+                          className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs px-2 py-1 rounded transition-colors">
+                          Guardar
+                        </button>
+                        <button
+                          onClick={() => { setEditandoNombre(null); setNuevoNombre('') }}
+                          className="text-slate-500 hover:text-slate-300 text-xs transition-colors">
+                          Cancelar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-slate-300">{g.admin_nombre || '— sin asignar'}</span>
+                        <button
+                          onClick={() => { setEditandoNombre(g.id); setNuevoNombre(g.admin_nombre ?? '') }}
                           className="text-xs text-slate-500 hover:text-emerald-400 underline transition-colors ml-1">
                           Cambiar
                         </button>

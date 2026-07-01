@@ -12,6 +12,9 @@ export interface Liga extends Auditoria {
   nombre: string
   codigo: string
   admin_password: string | null
+  yape_numero: string | null    // cobro con Yape (migration_012)
+  yape_nombre: string | null
+  yape_qr_url: string | null
   campeon: string | null
   created_at: string
 }
@@ -26,6 +29,7 @@ export interface Grupo extends Auditoria {
   costo_inscripcion: number
   cierre_inscripciones: string | null
   admin_password: string | null
+  admin_nombre: string | null   // quién administra (lo fija el superadmin)
   campeon: string | null
   created_at: string
   liga_id: string | null
@@ -42,6 +46,9 @@ export interface Participante extends Auditoria {
   nombre: string
   documento: string
   pago: boolean
+  pago_estado: 'pendiente' | 'reportado' | 'confirmado'  // flujo Yape (migration_012)
+  pago_operacion: string | null
+  pago_reportado_at: string | null
   prediccion_campeon: string | null
   created_at: string
 }

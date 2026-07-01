@@ -34,6 +34,9 @@ export default function LigaAdminPage() {
   const [res, setRes] = useState<Record<string, Score>>({})
   const [cfgCosto, setCfgCosto] = useState('')
   const [cfgCierre, setCfgCierre] = useState('')
+  const [cfgYapeNum, setCfgYapeNum] = useState('')
+  const [cfgYapeNom, setCfgYapeNom] = useState('')
+  const [cfgYapeQr, setCfgYapeQr] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const [waMsg, setWaMsg] = useState('')
@@ -43,6 +46,7 @@ export default function LigaAdminPage() {
     setLoading(true)
     const l = await fetchLiga(codigo); if (!l) { setLoading(false); return }
     setLiga(l)
+    setCfgYapeNum(l.yape_numero ?? ''); setCfgYapeNom(l.yape_nombre ?? ''); setCfgYapeQr(l.yape_qr_url ?? '')
     const ps = await fetchPozos(l.id); setPozos(ps)
     setSel(s => s || ps[0]?.id || '')
 
@@ -99,11 +103,23 @@ export default function LigaAdminPage() {
     return false
   }
 
-  async function togglePago(p: Participante) {
-    const nuevo = !p.pago
-    const r = await fetch('/api/admin/pago', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participanteId: p.id, pago: nuevo }) })
+  async function marcarPago(p: Participante, valor: boolean) {
+    const r = await fetch('/api/admin/pago', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participanteId: p.id, pago: valor }) })
     if (sesionVencida(r.status)) return
-    if (r.ok) setPartsByPozo(prev => ({ ...prev, [p.grupo_id]: prev[p.grupo_id].map(x => x.id === p.id ? { ...x, pago: nuevo } : x) }))
+    if (r.ok) setPartsByPozo(prev => ({ ...prev, [p.grupo_id]: prev[p.grupo_id].map(x => x.id === p.id ? { ...x, pago: valor, pago_estado: valor ? 'confirmado' : 'pendiente' } : x) }))
+  }
+
+  async function guardarYape() {
+    if (!liga) return
+    const r = await fetch('/api/admin/yape', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ligaId: liga.id, yapeNumero: cfgYapeNum, yapeNombre: cfgYapeNom, yapeQrUrl: cfgYapeQr }),
+    })
+    if (sesionVencida(r.status)) return
+    if (r.ok) {
+      setLiga(prev => prev ? { ...prev, yape_numero: cfgYapeNum.trim() || null, yape_nombre: cfgYapeNom.trim() || null, yape_qr_url: cfgYapeQr.trim() || null } : prev)
+      flash('✅ Yape guardado')
+    } else flash('Error al guardar Yape')
   }
 
   async function resetPin(p: Participante) {
@@ -316,13 +332,30 @@ export default function LigaAdminPage() {
                     <span className="text-pool-muted text-sm w-6">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold truncate">{p.nombre}</div>
-                      <div className="text-pool-muted text-xs">Doc: {p.documento}</div>
+                      <div className="text-pool-muted text-xs">
+                        Doc: {p.documento}
+                        {p.pago_estado === 'reportado' && p.pago_operacion && (
+                          <span className="text-pool-gold"> · Op. Yape: {p.pago_operacion}</span>
+                        )}
+                      </div>
                     </div>
                     <button onClick={() => resetPin(p)} className="px-2.5 py-1.5 rounded-lg text-xs font-condensed font-bold uppercase bg-white/5 text-pool-muted hover:text-pool-text" title="Resetear PIN">🔑 PIN</button>
-                    <button onClick={() => togglePago(p)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-condensed font-bold uppercase ${p.pago ? 'bg-pool-green/15 text-pool-green' : 'bg-pool-gold/15 text-pool-gold'}`}>
-                      {p.pago ? '✓ Pagó' : 'Pendiente'}
-                    </button>
+                    {p.pago ? (
+                      <button onClick={() => marcarPago(p, false)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-condensed font-bold uppercase bg-pool-green/15 text-pool-green" title="Quitar pago">
+                        ✓ Pagó
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-1.5 rounded-lg text-xs font-condensed font-bold uppercase ${p.pago_estado === 'reportado' ? 'bg-pool-gold/15 text-pool-gold' : 'bg-white/5 text-pool-muted'}`}>
+                          {p.pago_estado === 'reportado' ? '⏳ Reportó' : 'Pendiente'}
+                        </span>
+                        <button onClick={() => marcarPago(p, true)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-condensed font-bold uppercase bg-pool-green/15 text-pool-green hover:bg-pool-green/25">
+                          Confirmar
+                        </button>
+                      </div>
+                    )}
                   </Card>
                 ))}
                 {inscritos.length === 0 && <Card className="p-4 text-pool-muted text-sm">Nadie se inscribió en este pozo.</Card>}
@@ -372,21 +405,50 @@ export default function LigaAdminPage() {
               </Card>
             )}
 
-            {/* ── CONFIG: costo/cierre ── */}
+            {/* ── CONFIG: costo/cierre + Yape ── */}
             {seccion === 'config' && (
-              <Card className="p-5 max-w-md space-y-4">
-                <div>
-                  <label className="block text-sm text-pool-muted mb-1.5">Costo de inscripción (S/)</label>
-                  <input value={cfgCosto} onChange={e => setCfgCosto(e.target.value)} inputMode="decimal" placeholder="0"
-                    className="w-full bg-pool-bg border border-white/15 rounded-lg px-4 py-2.5" />
-                </div>
-                <div>
-                  <label className="block text-sm text-pool-muted mb-1.5">Cierre de inscripciones</label>
-                  <input type="datetime-local" value={cfgCierre} onChange={e => setCfgCierre(e.target.value)}
-                    className="w-full bg-pool-bg border border-white/15 rounded-lg px-4 py-2.5 [color-scheme:dark]" />
-                </div>
-                <Button onClick={guardarConfig} className="w-full">Guardar configuración</Button>
-              </Card>
+              <div className="max-w-md space-y-4">
+                <Card className="p-5 space-y-4">
+                  <div>
+                    <label className="block text-sm text-pool-muted mb-1.5">Costo de inscripción (S/)</label>
+                    <input value={cfgCosto} onChange={e => setCfgCosto(e.target.value)} inputMode="decimal" placeholder="0"
+                      className="w-full bg-pool-bg border border-white/15 rounded-lg px-4 py-2.5" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-pool-muted mb-1.5">Cierre de inscripciones</label>
+                    <input type="datetime-local" value={cfgCierre} onChange={e => setCfgCierre(e.target.value)}
+                      className="w-full bg-pool-bg border border-white/15 rounded-lg px-4 py-2.5 [color-scheme:dark]" />
+                  </div>
+                  <Button onClick={guardarConfig} className="w-full">Guardar configuración</Button>
+                </Card>
+
+                <Card className="p-5 space-y-4">
+                  <div>
+                    <h3 className="font-condensed font-bold uppercase text-sm">💜 Cobro con Yape</h3>
+                    <p className="text-pool-muted text-xs mt-0.5">Uno para toda la liga. Se lo mostramos al jugador para que pague y reporte su código de operación.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-pool-muted mb-1.5">Número de Yape</label>
+                    <input value={cfgYapeNum} onChange={e => setCfgYapeNum(e.target.value)} inputMode="numeric" placeholder="Ej. 987 654 321"
+                      className="w-full bg-pool-bg border border-white/15 rounded-lg px-4 py-2.5" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-pool-muted mb-1.5">Titular de la cuenta</label>
+                    <input value={cfgYapeNom} onChange={e => setCfgYapeNom(e.target.value)} placeholder="Nombre que aparece en Yape"
+                      className="w-full bg-pool-bg border border-white/15 rounded-lg px-4 py-2.5" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-pool-muted mb-1.5">URL del QR (opcional)</label>
+                    <input value={cfgYapeQr} onChange={e => setCfgYapeQr(e.target.value)} placeholder="https://…imagen del QR"
+                      className="w-full bg-pool-bg border border-white/15 rounded-lg px-4 py-2.5" />
+                    {cfgYapeQr.trim() && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cfgYapeQr} alt="QR Yape" className="mt-2 w-32 h-32 object-contain rounded-lg border border-white/10 bg-white p-1" />
+                    )}
+                  </div>
+                  <Button onClick={guardarYape} className="w-full">Guardar Yape</Button>
+                </Card>
+              </div>
             )}
           </>
         )}
